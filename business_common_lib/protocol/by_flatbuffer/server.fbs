@@ -1,0 +1,13 @@
+include "server_common.fbs";
+include "server_test.fbs";
+
+union ServerPacket { 
+	ServerCommon.Body,
+	ServerTest.Body
+}
+
+table ServerPacketBody {
+	body:ServerPacket;
+}
+
+root_type ServerPacketBody;

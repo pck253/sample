@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="connecter">
+      <UniqueIdentifier>{acfe02f6-553f-4fc6-84f6-1e9445e6ff13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="listener">
+      <UniqueIdentifier>{656b6595-d9b6-491b-bce0-f42fe6a8148d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="connection">
+      <UniqueIdentifier>{a894339e-c31a-4711-9e5b-7c6c2cc78e2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="public">
+      <UniqueIdentifier>{8d2b2320-0fd9-4dce-bc6d-99e9f219359d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="connecter\connecter.h">
+      <Filter>connecter</Filter>
+    </ClInclude>
+    <ClInclude Include="listener\listener.h">
+      <Filter>listener</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="network.h" />
+    <ClInclude Include="connection\receive_buffer.h">
+      <Filter>connection</Filter>
+    </ClInclude>
+    <ClInclude Include="connection\send_buffer.h">
+      <Filter>connection</Filter>
+    </ClInclude>
+    <ClInclude Include="connection\connection_impl.h">
+      <Filter>connection</Filter>
+    </ClInclude>
+    <ClInclude Include="public\connection.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="public\network_accessor.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="network_accessor_impl.h" />
+    <ClInclude Include="connection_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="connecter\connecter.cpp">
+      <Filter>connecter</Filter>
+    </ClCompile>
+    <ClCompile Include="listener\listener.cpp">
+      <Filter>listener</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="network.cpp" />
+    <ClCompile Include="connection\receive_buffer.cpp">
+      <Filter>connection</Filter>
+    </ClCompile>
+    <ClCompile Include="connection\send_buffer.cpp">
+      <Filter>connection</Filter>
+    </ClCompile>
+    <ClCompile Include="connection\connection_impl.cpp">
+      <Filter>connection</Filter>
+    </ClCompile>
+    <ClCompile Include="network_accessor_impl.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+</Project>

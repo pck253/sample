@@ -1,0 +1,17 @@
+namespace Client;
+
+union Protocol {
+    TestMessage
+}
+
+table TestMessage {
+    sequence:ulong;
+    title:string;
+    body:string;
+}
+
+table Body {
+	body:Protocol;
+}
+
+root_type Body;

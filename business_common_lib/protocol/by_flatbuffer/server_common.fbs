@@ -1,0 +1,21 @@
+namespace ServerCommon;
+
+union Protocol {
+    Activation,
+	Shutdown
+}
+
+table Activation {
+    moduleType:ushort;
+    serverId:ushort;
+    serverGroupId:ushort;
+}
+
+table Shutdown {
+}
+
+table Body {
+	body:Protocol;
+}
+
+root_type Body;
