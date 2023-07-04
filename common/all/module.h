@@ -7,6 +7,7 @@ enum class EModule : uint8_t
 	Restful = 2,
 	Timer = 3,
 	Server = 4,
+	TestClient = 5,
 	Max
 };
 

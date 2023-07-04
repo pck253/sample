@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="test_client.h" />
+    <ClInclude Include="test_client_alias.h" />
+    <ClInclude Include="session\session.h">
+      <Filter>session</Filter>
+    </ClInclude>
+    <ClInclude Include="session\packet_handler.h">
+      <Filter>session</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="test_client.cpp" />
+    <ClCompile Include="session\session.cpp">
+      <Filter>session</Filter>
+    </ClCompile>
+    <ClCompile Include="session\packet_handler.cpp">
+      <Filter>session</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="session">
+      <UniqueIdentifier>{9371c9b0-b89b-44ad-88b5-4a795fecabd5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
