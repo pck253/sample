@@ -65,13 +65,9 @@ bool VerifyProtocolVector(::flatbuffers::Verifier &verifier, const ::flatbuffers
 struct TestMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef TestMessageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SEQUENCE = 4,
-    VT_TITLE = 6,
-    VT_BODY = 8
+    VT_TITLE = 4,
+    VT_BODY = 6
   };
-  uint64_t sequence() const {
-    return GetField<uint64_t>(VT_SEQUENCE, 0);
-  }
   const ::flatbuffers::String *title() const {
     return GetPointer<const ::flatbuffers::String *>(VT_TITLE);
   }
@@ -80,7 +76,6 @@ struct TestMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint64_t>(verifier, VT_SEQUENCE, 8) &&
            VerifyOffset(verifier, VT_TITLE) &&
            verifier.VerifyString(title()) &&
            VerifyOffset(verifier, VT_BODY) &&
@@ -93,9 +88,6 @@ struct TestMessageBuilder {
   typedef TestMessage Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_sequence(uint64_t sequence) {
-    fbb_.AddElement<uint64_t>(TestMessage::VT_SEQUENCE, sequence, 0);
-  }
   void add_title(::flatbuffers::Offset<::flatbuffers::String> title) {
     fbb_.AddOffset(TestMessage::VT_TITLE, title);
   }
@@ -115,11 +107,9 @@ struct TestMessageBuilder {
 
 inline ::flatbuffers::Offset<TestMessage> CreateTestMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint64_t sequence = 0,
     ::flatbuffers::Offset<::flatbuffers::String> title = 0,
     ::flatbuffers::Offset<::flatbuffers::String> body = 0) {
   TestMessageBuilder builder_(_fbb);
-  builder_.add_sequence(sequence);
   builder_.add_body(body);
   builder_.add_title(title);
   return builder_.Finish();
@@ -127,14 +117,12 @@ inline ::flatbuffers::Offset<TestMessage> CreateTestMessage(
 
 inline ::flatbuffers::Offset<TestMessage> CreateTestMessageDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint64_t sequence = 0,
     const char *title = nullptr,
     const char *body = nullptr) {
   auto title__ = title ? _fbb.CreateString(title) : 0;
   auto body__ = body ? _fbb.CreateString(body) : 0;
   return Client::CreateTestMessage(
       _fbb,
-      sequence,
       title__,
       body__);
 }
