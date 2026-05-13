@@ -3,12 +3,108 @@
 MODULE_STATIC_IMPL(Server);
 
 Server::Server(const std::string& _configFilePath)
-	: Module(_configFilePath), m_serverSessionManager(m_threadPool)
+	: Module(_configFilePath), m_threadPool("Server ThreadPool"), m_serverSessionManager(m_threadPool)
 {
 }
 
 Server::~Server()
 {
+}
+
+static bool OnAcceptedConnection(const Result& _result, ConnectionShared_t _conn)
+{
+	if (!_result)
+	{
+		LogWarning("failed to accept");
+		return false;
+	}
+
+	if (!_conn->IsPublic())
+	{
+		Module::Get<Server>()->ServerConnected(_conn);
+	}
+	else
+	{
+		Module::Get<Server>()->AddUserSession(_conn);
+	}
+
+	return true;
+}
+
+static bool OnConnected(const Result& _result, const std::string& _connecterName, ConnectionShared_t _conn)
+{
+	if (!_result)
+	{
+		LogWarning("AcceptedHandler : {}", _result.message);
+		return false;
+	}
+
+	Module::Get<Server>()->ServerConnected(_conn);
+
+	return true;
+}
+
+static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t& _conn)
+{
+	if (_conn->IsPublic())
+	{
+		auto const user = Module::Get<Server>()->FindUserSession(_conn->GetConnectionId());
+		if (not user)
+		{
+			LogError("not exist user");
+			return;
+		}
+
+		user->PushJob([_rawData = std::move(_rawData)](const UserSessionShared_t& _user) mutable
+			{
+				_user->Get<UserSession>()->CallPacketHandler(std::move(_rawData));
+			});
+	}
+	else
+	{
+		auto const server = Module::Get<Server>()->GetServerSessionManager().FindSession(_conn->GetConnectionId());
+		if (not server)
+		{
+			LogError("not exist server");
+			return;
+		}
+
+		server->PushJob([_rawData = std::move(_rawData)](const ServerSessionShared_t& _server) mutable
+			{
+				_server->CallPacketHandler(std::move(_rawData));
+			});
+	}
+}
+
+static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, const bool _isPublic)
+{
+	if (_isPublic)
+	{
+		if (!_result.message.empty())
+		{
+			LogWarning("Closed User Session : {}", _result.message);
+		}
+		Module::Get<Server>()->ClosedUserSession(_result, _connectionId);
+	}
+	else
+	{
+		if (!_result.message.empty())
+		{
+			LogWarning("Closed Server Session : {}", _result.message);
+		}
+
+		auto session = Module::Get<Server>()->GetServerSessionManager().RemoveSession(_connectionId);
+		if (session)
+		{
+			session->Closed();
+		}
+	}
+}
+
+static bool OnRestfulRequest(const RestufulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, WebAccessor* _accessor)
+{
+	Module::Get<Server>()->CallRestfulHandler(_requestId, _path, _query, _accessor);
+	return true;
 }
 
 Result Server::InitImpl()
@@ -31,69 +127,37 @@ Result Server::InitImpl()
 	m_threadPool.Init(threadCount);
 
 	auto id = m_config["id"];
-	if (!id.is_number_unsigned() || (std::numeric_limits<ServerId_t>::max)() < id.get<ServerId_t>())
+	if (!id.is_number_unsigned() || (std::numeric_limits<ServerId_t::IdType>::max)() < id.get<ServerId_t::IdType>())
 	{
 		return EError::InvalidServerId;
 	}
-	m_id = id.get<ServerId_t>();
+	m_id = id.get<ServerId_t::IdType>();
 
 	auto groupId = m_config["group id"];
-	if (!groupId.is_number_unsigned() || (std::numeric_limits<ServerGroupId_t>::max)() < groupId.get<ServerGroupId_t>())
+	if (!groupId.is_number_unsigned() || (std::numeric_limits<ServerGroupId_t::IdType>::max)() < groupId.get<ServerGroupId_t::IdType>())
 	{
 		return EError::InvalidServerGroupId;
 	}
-	m_groupId = groupId.get<ServerGroupId_t>();
+	m_groupId = groupId.get<ServerGroupId_t::IdType>();
 
 	// network
+	AcceptedConfig acceptedConfig;
+	acceptedConfig.Set(OnAcceptedConnection, OnReceived, OnClosed);
+
+	ConnectedConfig connectedConfig{ OnConnected, OnReceived, OnClosed };
+
 	NetworkHelper networkHelper;
-	ModuleAccessor* networkAccessor = nullptr;
-	auto result = networkHelper.SettingByConfig(m_config, GetApplication(), (ModuleAccessor*&)networkAccessor,
-		[](const Result& _result, ConnectionShared_t _conn) -> bool
-		{
-			if (_result != EError::Success)
-			{
-				LogWarning("failed to accept");
-				return false;
-			}
-
-			if (!_conn->IsPublic())
-			{
-				Module::Get<Server>()->ServerConnected(_conn);
-			}
-			else
-			{
-				Module::Get<Server>()->AddUserSession(_conn);
-			}
-
-			return true;
-		},
-		[](const Result & _result, const std::string & _connecterName, ConnectionShared_t _conn) -> bool
-		{
-			if (_result != EError::Success)
-			{
-				LogWarning("failed to connect");
-				return false;
-			}
-
-			Module::Get<Server>()->ServerConnected(_conn);
-
-			return true;
-		});
-	if (result != EError::Success)
+	auto result = networkHelper.SettingByConfig(m_config, GetApplication(), acceptedConfig, connectedConfig);
+	if (!result)
 	{
 		return result;
 	}
 
-	// restful
-	RestfulHelper restfulHelper;
-	ModuleAccessor* restfulAccessor = nullptr;
-	result = restfulHelper.SettingByConfig(m_config, GetApplication(), restfulAccessor,
-		[](const RestfulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, RestfulAccessor* _accessor) -> bool
-		{
-			Module::Get<Server>()->CallRestfulHandler(_requestId, _path, _query, _accessor);
-			return true;
-		});
-	if (result != EError::Success)
+	// web
+	WebHelper webHelper;
+	ModuleAccessor* webAccessor = nullptr;
+	result = webHelper.SettingByConfig(m_config, GetApplication(), webAccessor, OnRestfulRequest);
+	if (!result)
 	{
 		return result;
 	}
@@ -104,58 +168,21 @@ Result Server::InitImpl()
 	{
 		return EError::NotExistModule;
 	}
-	m_timerJobManager = TimerJobManager::Create<TimerJobManager>(m_threadPool);
-	m_timerJobManager->Init(static_cast<TimerAccessor*>(timerModule->GetAccessor()));
+	m_timerJobManager = static_cast<TimerAccessor*>(timerModule->GetAccessor())->AllocateTimerJobManager(m_threadPool);
 
 	return EError::Success;
 }
 
 void Server::InitRestfulHandlers()
 {
-	m_restfulHandlers.emplace(L"/shutdown", [this](const RestfulParams&)
+	m_restfulHandlers.emplace(L"/shutdown", [this](const WebParams&)
 		{
-			GetServerSessionManager().Travel([](ServerSessionShared_t& _session)
-				{
-					FLAT_BUFFER_BUILDER(builder);
-					auto shutdown = ServerCommon::CreateShutdown(builder);
-					auto serverCommon = ServerCommon::CreateBody(builder, ServerCommon::Protocol::Protocol_Shutdown, shutdown.Union());
-					auto packet = CreateServerPacketBody(builder, ServerPacket::ServerPacket_ServerCommon_Body, serverCommon.Union());
-					builder.Finish(packet);
-
-					Fb::SerializedInfo serializedInfo = Fb::MakeSerializedInfo(builder);
-					_session->Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
-				});
-			GetApplication()->TryShutdown();
-			return nlohmann::json({ {"message", "done"} });
-		});
-	m_restfulHandlers.emplace(L"/kick", [this](const RestfulParams& _params)
-		{
-			auto found = _params.m_params.find("target");
-			if (_params.m_params.end() == found)
-			{
-				return nlohmann::json({ {"error", "invalid params"} });
-			}
-			ConnectionId_t connectionId = std::stoull(found->second);
-			auto user = FindUserSession(connectionId);
-			if (!user)
-			{
-				return nlohmann::json({ {"error", "not exist target."} });
-			}
-
-			user->Close(EError::Kick);
-
-			return nlohmann::json({ {"message", "done"} });
-		});
-	m_restfulHandlers.emplace(L"/kickall", [this](const RestfulParams& _params)
-		{
-			NetworkHelper networkHelper;
-			networkHelper.ShutdownPublic(m_config, GetApplication());
-
+			GetApplication()->Shutdown();
 			return nlohmann::json({ {"message", "done"} });
 		});
 }
 
-void Server::CallRestfulHandler(const RestfulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, RestfulAccessor* _accessor)
+void Server::CallRestfulHandler(const RestufulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, WebAccessor* _accessor)
 {
 	m_threadPool.PushJob([this, _requestId, _path, _query, _accessor]()
 		{
@@ -165,10 +192,10 @@ void Server::CallRestfulHandler(const RestfulRequestId_t& _requestId, const std:
 				return;
 			}
 
-			RestfulParams params;
+			WebParams params;
 			params.Parse(_query);
 
-			if (params.m_result != EError::Success)
+			if (!params.m_result)
 			{
 				_accessor->Response(_requestId, nlohmann::json({ {"error", "invalid params"} }));
 				return;
@@ -186,15 +213,9 @@ void Server::Shutdown()
 
 	if (m_timerJobManager)
 	{
-		m_timerJobManager->Shutdown();
+		m_timerJobManager->Shutdown(EShutdownMode::RightNow, "timer job manager counter.");
 	}
-
-	while (!m_threadPool.IsEmpty())
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		Log("Server Shutdown : waiting until thread pool is empty.");
-	}
-	m_threadPool.Shutdown();
+	m_threadPool.Shutdown(EShutdownMode::EmptyJob, "thread pool shutdown.");
 
 	UserSession::UninitPacketHandlers();
 	ServerSession::UninitPacketHandlers();
@@ -204,31 +225,12 @@ void Server::Shutdown()
 
 UserSessionShared_t Server::AddUserSession(ConnectionShared_t _conn)
 {
-	UserSessionShared_t user = UserSession::Create(_conn, m_threadPool);
+	UserSessionShared_t user = UserSession::Create<UserSession>(m_threadPool, _conn);
 
 	{
 		SCOPED_WRITE_LOCK(m_userSessionsMutex);
 		m_userSessions.emplace(_conn->GetConnectionId(), user);
 	}
-
-	_conn->SetReceivedHandler([user](our::vector<uint8_t>&& _rawData, ConnectionShared_t _conn)
-		{
-			user->PushJob([user, _rawData = std::move(_rawData)]() mutable
-				{
-					user->Get<UserSession>()->CallPacketHandler(std::move(_rawData));
-				});
-		});
-
-	//_conn->SetSentHandler([](const size_t& _size){});
-
-	_conn->SetClosedHandler([](const Result& _result, const ConnectionId_t & _connectionId, const bool& _isPublic)
-		{
-			if (!_result.message.empty())
-			{
-				LogWarning("Closed User Session : {}", _result.message);
-			}
-			Module::Get<Server>()->ClosedUserSession(_result, _connectionId);
-		});
 
 	return user;
 }
@@ -250,21 +252,9 @@ void Server::ClosedUserSession(const Result& _result, const ConnectionId_t& _con
 
 	if (user)
 	{
-		user->PushJob([user, _result]()
+		user->PushJob([_result](const UserSessionShared_t& _user)
 			{
-				user->Closed(_result);
-			});
-	}
-}
-
-void Server::PushJobToAllUserForDev(std::function<void(UserSessionShared_t&)>&& _job)
-{
-	SCOPED_READ_LOCK(m_userSessionsMutex);
-	for (auto& [connectionId, user] : m_userSessions)
-	{
-		user->PushJob([user, _job]() mutable
-			{
-				_job(user);
+				_user->Closed(_result);
 			});
 	}
 }
@@ -272,30 +262,6 @@ void Server::PushJobToAllUserForDev(std::function<void(UserSessionShared_t&)>&& 
 ServerSessionShared_t Server::ServerConnected(ConnectionShared_t _conn)
 {
 	auto server = Module::Get<Server>()->GetServerSessionManager().CreateSession(_conn);
-
-	_conn->SetReceivedHandler([server](our::vector<uint8_t>&& _rawData, ConnectionShared_t _conn)
-		{
-			server->PushJob([server, _rawData = std::move(_rawData)]() mutable
-				{
-					server->CallPacketHandler(std::move(_rawData));
-				});
-		});
-
-	//_conn->SetSentHandler([](const size_t& _size){});
-
-	_conn->SetClosedHandler([](const Result& _result, const ConnectionId_t& _connectionId, const bool& _isPublic)
-		{
-			if (!_result.message.empty())
-			{
-				LogWarning("Closed Server Session : {}", _result.message);
-			}
-
-			auto session = Module::Get<Server>()->GetServerSessionManager().RemoveSession(_connectionId);
-			if (session)
-			{
-				session->Closed();
-			}
-		});
 
 	server->SendActivation(GetModuleType(), GetServerId(), GetServerGroupId());
 

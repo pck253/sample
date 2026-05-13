@@ -17,9 +17,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\etc_utility.h">
       <Filter>all\utility</Filter>
     </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\job_utility.h">
-      <Filter>all\utility</Filter>
-    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\string_utility.h">
       <Filter>all\utility</Filter>
     </ClInclude>
@@ -28,9 +25,6 @@
     </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)all\thread\thread_pool.h">
       <Filter>all\thread</Filter>
-    </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)module\module_static_impl.h">
-      <Filter>module</Filter>
     </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)all\math\math_common.h">
       <Filter>all\math</Filter>
@@ -41,16 +35,31 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\stl_allocator.h">
       <Filter>all\allocator</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\cheat\cheat_command.h">
+      <Filter>all\cheat</Filter>
+    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\memory_pool.h">
+      <Filter>all\allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\shutdown_utility.h">
+      <Filter>all\utility</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\time_utility.h">
+      <Filter>all\utility</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)module_impl\module_static_impl.h">
+      <Filter>module_impl</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\stl_utility.h">
+      <Filter>all\utility</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\instance_pool.h">
       <Filter>all\allocator</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="all">
       <UniqueIdentifier>{0a150944-2c89-4fd9-862e-aeeac468bf5b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="module">
-      <UniqueIdentifier>{874471b0-77a4-4e16-82b3-4bf3c756bf44}</UniqueIdentifier>
     </Filter>
     <Filter Include="all\utility">
       <UniqueIdentifier>{14c62d70-49a9-4890-ab76-630c26f023b4}</UniqueIdentifier>
@@ -63,6 +72,12 @@
     </Filter>
     <Filter Include="all\allocator">
       <UniqueIdentifier>{fa2befc9-d906-4afe-911f-ef5c4037bc8e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="all\cheat">
+      <UniqueIdentifier>{c02d8246-1fc3-4e54-9a78-9464c9bc8b6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="module_impl">
+      <UniqueIdentifier>{874471b0-77a4-4e16-82b3-4bf3c756bf44}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

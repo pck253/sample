@@ -1,5 +1,7 @@
 #include "pch.h"
 
+static_assert(NETWORK_MODULE == 1);
+
 SendBuffer::SendBuffer()
 {
 	m_lastUsingBufferInfo = GetFreeBuffer();
@@ -45,99 +47,117 @@ SendBufferInfo* SendBuffer::GetFreeBuffer()
 	return buffer;
 }
 
-Result SendBuffer::Write(const PacketSize_t& _size, const uint8_t* _serializedData, ReservedSendData_t& _output)
+Result SendBuffer::Write(const PacketSize_t& _packetSize, const uint8_t* _serializedData, ReservedSendData_t& _output)
 {
-	if (_size > (MAX_PACKET_SIZE - PACKET_SIZE_BYTE))
+	if (_packetSize > (MAX_PACKET_SIZE - PACKET_SIZE_BYTE))
 	{
 		return EError::OverMaxPacketSize;
 	}
-	PacketSize_t includeHeaderSize = _size + PACKET_SIZE_BYTE;
+	PacketSize_t includeHeaderSize = _packetSize + PACKET_SIZE_BYTE;
 
-	our::vector<ReservedSendData_t::value_type*> sendDatas;
-	sendDatas.reserve(2);
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	// allocate buffers
+	//	: using max 2 buffers because buffer total size is MAX_PACKET_SIZE.
+	size_t freeSize = MAX_PACKET_SIZE - m_lastUsingBufferInfo->writableIndex;
+	size_t remainSize = (includeHeaderSize <= freeSize) ? 0 : includeHeaderSize - freeSize;
 
+	SendBufferInfo* bufferInfo01 = (freeSize != 0) ? m_lastUsingBufferInfo : nullptr;
+	SendBufferInfo* bufferInfo02 = nullptr;
+	if (remainSize > 0)
 	{
-		// calc encryption size
-
-		SendBufferInfo* bufferInfo01 = nullptr;
-		SendBufferInfo* bufferInfo02 = nullptr;
-
-		size_t freeSize = MAX_PACKET_SIZE - m_lastUsingBufferInfo->writableIndex;
-		size_t remainSize = (includeHeaderSize <= freeSize) ? 0 : includeHeaderSize - freeSize;
-
-		bufferInfo01 = (freeSize != 0) ? m_lastUsingBufferInfo : nullptr;
-		if (remainSize > 0)
+		bufferInfo02 = GetFreeBuffer();
+		if (bufferInfo02 == nullptr)
 		{
-			bufferInfo02 = GetFreeBuffer();
-			if (bufferInfo02 == nullptr)
-			{
-				return EError::NotExistSendBuffer;
-			}
-			m_lastUsingBufferInfo = bufferInfo02;
-			m_usingBuffers.emplace(bufferInfo02);
+			return EError::NotExistSendBuffer;
 		}
+		m_lastUsingBufferInfo = bufferInfo02;
+		m_usingBuffers.emplace(bufferInfo02);
+	}
+	// allocate buffers
+	/////////////////////////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	// copy to buffers
+	{
+
+		bool headerWrite = true;
+		size_t headerRemain = PACKET_SIZE_BYTE;
+		size_t dataRemain = _packetSize;
+
+		auto copyFunc = [&headerWrite, &headerRemain, &dataRemain, &_packetSize, &_serializedData](uint8_t* _buffer, size_t _bufferSize)
+			{
+				if (headerWrite)
+				{
+					const uint8_t* header = ((const uint8_t*)&_packetSize) + (PACKET_SIZE_BYTE - headerRemain);
+					if (_bufferSize >= headerRemain)
+					{
+						memcpy_s(_buffer, _bufferSize, header, headerRemain);
+						_buffer += headerRemain;
+						_bufferSize -= headerRemain;
+
+						headerRemain = 0;
+						headerWrite = false;
+					}
+					else
+					{
+						memcpy_s(_buffer, _bufferSize, header, _bufferSize);
+						headerRemain -= _bufferSize;
+					}
+				}
+
+				if (!headerWrite && _bufferSize > 0)
+				{
+					const uint8_t* data = _serializedData + (_packetSize - dataRemain);
+					if (_bufferSize >= dataRemain)
+					{
+						memcpy_s(_buffer, _bufferSize, data, dataRemain);
+						dataRemain = 0;
+					}
+					else
+					{
+						memcpy_s(_buffer, _bufferSize, data, _bufferSize);
+						dataRemain -= _bufferSize;
+					}
+				}
+			};
 
 		if (bufferInfo01)
 		{
-			auto& ret = _output.emplace_back(std::make_tuple(bufferInfo01, bufferInfo01->buffer + bufferInfo01->writableIndex, (includeHeaderSize - remainSize)));
-			sendDatas.emplace_back(&ret);
-			bufferInfo01->writableIndex += (includeHeaderSize - remainSize);
-			bufferInfo01->readableSize += (includeHeaderSize - remainSize);
+			uint8_t* buffer = bufferInfo01->buffer + bufferInfo01->writableIndex;
+			size_t bufferSize = includeHeaderSize - remainSize;
+
+			if (_output.empty() ||
+				std::get<BUFFER_INFO_INDEX>(_output.back()) != bufferInfo01)
+			{
+				_output.emplace_back(std::make_tuple(bufferInfo01, buffer, bufferSize));
+			}
+			else
+			{
+				// does not create new ReservedSendData because current buffer is same a last ReservedSendData's buffer.
+				// only update send data size.
+				std::get<BUFFER_SIZE_INDEX>(_output.back()) += bufferSize;
+			}
+
+			bufferInfo01->writableIndex += bufferSize;
+			bufferInfo01->readableSize += bufferSize;
+
+			copyFunc(buffer, bufferSize);
 		}
 
 		if (bufferInfo02)
 		{
-			auto& ret = _output.emplace_back(std::make_tuple(bufferInfo02, bufferInfo02->buffer + bufferInfo02->writableIndex, remainSize));
-			sendDatas.emplace_back(&ret);
-			bufferInfo02->writableIndex += remainSize;
-			bufferInfo02->readableSize += remainSize;
+			uint8_t* buffer = bufferInfo02->buffer + bufferInfo02->writableIndex;
+			size_t bufferSize = remainSize;
+
+			_output.emplace_back(std::make_tuple(bufferInfo02, buffer, bufferSize));
+			bufferInfo02->writableIndex += bufferSize;
+			bufferInfo02->readableSize += bufferSize;
+
+			copyFunc(buffer, bufferSize);
 		}
 	}
-
-	// calc encryption and copy
-	bool headerWrite = true;
-	size_t headerRemain = PACKET_SIZE_BYTE;
-	size_t dataRemain = _size;
-
-	ReservedSendData_t remainBuffers;
-	for (auto& sendData : sendDatas)
-	{
-		uint8_t* buffer = std::get<BUFFER_ADDR_INDEX>(*sendData);
-		size_t size = std::get<BUFFER_SIZE_INDEX>(*sendData);
-
-		if (headerWrite)
-		{
-			const uint8_t* header = ((const uint8_t*)&_size) + (PACKET_SIZE_BYTE - headerRemain);
-			if (size >= headerRemain)
-			{
-				memcpy_s(buffer, size, header, headerRemain);
-				buffer += headerRemain;
-				size -= headerRemain;
-
-				headerRemain = 0;
-				headerWrite = false;
-			}
-			else
-			{
-				memcpy_s(buffer, size, header, size);
-				headerRemain -= size;
-				continue;
-			}
-		}
-
-		const uint8_t* data = _serializedData + (_size - dataRemain);
-		if (size >= dataRemain)
-		{
-			memcpy_s(buffer, size, data, dataRemain);
-			dataRemain = 0;
-			break;
-		}
-		else
-		{
-			memcpy_s(buffer, size, data, size);
-			dataRemain -= size;
-		}
-	}
+	// copy to buffers
+	/////////////////////////////////////////////////////////////////////////////////////////////
 
 	return EError::Success;
 }

@@ -8,6 +8,8 @@
 #include "public/connection.h"
 #include "public/network_accessor.h"
 
+#define UNREAL5_NAVMESH
+#define UNREAL_HEIGHT_MAP
 #include "business_common.h"
 
 #endif //PCH_H

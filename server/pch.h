@@ -6,7 +6,7 @@
 #include "public/connection.h"
 #include "public/network_accessor.h"
 
-#include "public/restful_accessor.h"
+#include "public/web_accessor.h"
 
 #include "public/timer_accessor.h"
 

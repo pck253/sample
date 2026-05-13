@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="web.cpp" />
+    <ClCompile Include="web_accessor_impl.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="restful\restful.cpp">
+      <Filter>restful</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="web.h" />
+    <ClInclude Include="web_accessor_impl.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="public\web_accessor.h" />
+    <ClInclude Include="restful\restful.h">
+      <Filter>restful</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="restful">
+      <UniqueIdentifier>{82b29fba-4173-4d37-91c2-df3181513a87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="curl">
+      <UniqueIdentifier>{5937b26c-0523-41c4-81e9-81458c68a4d3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

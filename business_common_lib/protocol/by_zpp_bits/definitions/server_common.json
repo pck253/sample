@@ -1,0 +1,17 @@
+{
+  "server": true,
+  "packets": [
+    {
+      "name": "Activation",
+      "fields": [
+        { "type": "EModule", "name": "moduleType" },
+        { "type": "ServerId_t", "name": "serverId" },
+        { "type": "ServerGroupId_t", "name": "serverGroupId" }
+      ]
+    },
+    {
+      "name": "Shutdown",
+      "fields": []
+    }
+  ]
+}

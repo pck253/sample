@@ -1,7 +1,12 @@
 #pragma once
 
 using ConnectionId_t = uint64_t;
+#define INVALID_CONNECTION_ID 0
+
 using PacketSize_t = uint16_t;
+
+constexpr size_t PACKET_SIZE_BYTE = sizeof(PacketSize_t);
+constexpr size_t MAX_PACKET_SIZE = std::numeric_limits<PacketSize_t>::max();	// include header size
 
 class PacketDeallocator : public std::enable_shared_from_this<PacketDeallocator>
 {
@@ -17,21 +22,18 @@ public:
     }
 
 private:
-    PacketDeallocator(std::function<void()>&& _deallocator)
+    explicit PacketDeallocator(std::function<void()>&& _deallocator) noexcept
         : m_deallocator(std::move(_deallocator)) {}
 
     std::function<void()> m_deallocator;
 };
 using PacketDeallocatorShared_t = std::shared_ptr<PacketDeallocator>;
 
-#define INVALID_CONNECTION_ID 0
-
 class Connection;
 using ConnectionShared_t = std::shared_ptr<Connection>;
 
-using SentHandler_t = std::function<void(const size_t&)>;
-using ReceivedHandler_t = std::function<void(our::vector<uint8_t>&&, ConnectionShared_t)>;
-using ClosedHandler_t = std::function<void(const Result&, const ConnectionId_t&, const bool&)>;
+using ReceivedHandler_t = void(*)(std::vector<uint8_t>&&, const ConnectionShared_t&);
+using ClosedHandler_t = void(*)(const Result&, const ConnectionId_t, const bool);
 
 class Connection : public std::enable_shared_from_this<Connection>
 {
@@ -42,24 +44,24 @@ public:
     virtual ~Connection() = default;
 
 public:
-    inline const std::string& GetRemoteAddress() { return m_remoteAddress; }
-    inline ConnectionId_t GetConnectionId() { return m_connectionId; }
-    inline bool IsPublic() { return m_isPublic; }
+    inline const std::string& GetRemoteAddress() const { return m_remoteAddress; }
+    inline ConnectionId_t GetConnectionId() const { return m_connectionId; }
+    inline bool IsPublic() const { return m_isPublic; }
 
     // _deallocator : for _serializedData
-    virtual Result Send(const PacketSize_t& _size, const uint8_t* _serializedData, PacketDeallocatorShared_t& _deallocator) = 0;
+    virtual Result Send(const PacketSize_t& _size, const uint8_t* _serializedData, const PacketDeallocatorShared_t& _deallocator) = 0;
     virtual Result Close(const Result& _reason = Result(EError::Success)) = 0;
 
-public:
-    virtual inline void SetSentHandler(SentHandler_t&& _sentHandler) = 0;
-    virtual inline void SetReceivedHandler(ReceivedHandler_t&& _receivedHandler) = 0;
-    virtual inline void SetClosedHandler(ClosedHandler_t&& _closedHandler) = 0;
+protected:
+    explicit Connection(const ConnectionId_t& _connectionId, const bool& _isPublic)
+        : m_connectionId(_connectionId), m_isPublic(_isPublic)
+    {
+    }
 
 protected:
-    Connection() = default;
-
+    std::atomic_bool m_isClosed = false;
     std::string m_remoteAddress;
-    ConnectionId_t m_connectionId = INVALID_CONNECTION_ID;
-    bool m_isPublic = false;
+    const ConnectionId_t m_connectionId;
+    const bool m_isPublic;
 };
 

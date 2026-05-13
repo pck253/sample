@@ -1,102 +1,64 @@
 #include "pch.h"
 
+static_assert(NETWORK_MODULE == 1);
+
 Listener::Listener(Network* _networkMoudle)
-	: ConnectionManager(_networkMoudle)
+	: ConnectionManager(_networkMoudle, EThreadPool::ASIO)
 {
+	m_afterShutdown = [this]()
+		{
+			// ----------------------------------------------------------------------------------
+			// no more listen
+			// ----------------------------------------------------------------------------------
+			for (auto& acceptorInfo : m_acceptorInfos)
+			{
+				if (not acceptorInfo.acceptor.is_open())
+				{
+					continue;
+				}
+
+				acceptorInfo.acceptor.cancel();	// refer to AcceptorInfo declare
+				acceptorInfo.acceptor.close();	// refer to AcceptorInfo declare
+			}
+
+			CloseAllAndWait(true);
+			CloseAllAndWait(false);
+
+			ShutdownThreadPool();
+
+			Log("Shutdown Listener");
+		};
 }
 
 Listener::~Listener()
 {
 }
 
-Result Listener::Init(our::vector<std::tuple<std::string, ip::tcp::endpoint, bool>>& _addresses, const uint16_t& _threadCount)
+Result Listener::Init(const std::vector<std::tuple<std::string, asio::ip::tcp::endpoint, bool>>& _addresses, const uint16_t& _threadCount)
 {
-	m_threadCount = _threadCount;
-
-	size_t concurrentAcceptCount = (std::max)(m_threadCount / _addresses.size(), (size_t)1);
+	if (_addresses.empty())
+	{
+		return EError::Success;
+	}
 
 	// ------------------------------------------------------------------------
-	// acceptor needs AcceptorInfo::acceptedHandler to listen : see SetAcceptedHandler
+	// acceptor needs AcceptorInfo::acceptedHandler to listen : see SetAcceptedConfig
 	// ------------------------------------------------------------------------
 	AcceptorIndex index = 0;
 	for (auto& [name, addr, isPublic] : _addresses)
 	{
-		AcceptorInfo& acceptorInfo = m_acceptorInfos.emplace_back(AcceptorInfo{ addr, ip::tcp::acceptor(m_ioContext, addr), isPublic, nullptr });
+		m_acceptorInfos.emplace_back(addr, *GetAsioContext(), isPublic);
 		m_acceptorNames.emplace(name, index);
 
 		++index;
 	}
 
-	m_workGuard = new WorkGuard_t(m_ioContext.get_executor());
-	for (uint16_t i = 0; i < m_threadCount; ++i)
-	{
-		m_threads.emplace_back([this]()
-			{
-				Log("Listener m_ioContext run.");
-				m_ioContext.run();
-				Log("Listener thread stop.");
-			});
-	}
+	InitThreadPool(_threadCount);
 
 	return EError::Success;
 }
 
-void Listener::Shutdown()
-{
-	m_shutdown = true;
-
-	// ----------------------------------------------------------------------------------
-	// no more listen
-	// ----------------------------------------------------------------------------------
-	for (auto& acceptorInfo : m_acceptorInfos)
-	{
-		if (!acceptorInfo.acceptor.is_open())
-		{
-			continue;
-		}
-
-		acceptorInfo.acceptor.cancel();
-		acceptorInfo.acceptor.close();
-		acceptorInfo.acceptor.release();
-	}
-
-	CloseAll(true);
-	CloseAll(false);
-
-	do
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	} while (!IsEmptyConnection(false) || !IsEmptyConnection(true));
-
-	if (m_workGuard)
-	{
-		m_workGuard->reset();
-	}
-
-	for (auto& thread : m_threads)
-	{
-		thread.join();
-	}
-
-	m_ioContext.stop();
-	while (!m_ioContext.stopped());
-
-	if (!IsEmptyConnection(true))
-	{
-		LogWarning("Remain Public Connection");
-	}
-
-	if (!IsEmptyConnection(false))
-	{
-		LogWarning("Remain private Connection");
-	}
-
-	m_acceptorInfos.clear();
-
-	Log("shutdown Listener");
-}
-
-Result Listener::SetAcceptedHandler(const std::string& _listenerName, AcceptedHandler_t&& _handler)
+Result Listener::SetAcceptedConfig(const std::string& _listenerName, const AcceptedConfig& _acceptedConfig)
 {
 	auto found = m_acceptorNames.find(_listenerName);
 	if (found == m_acceptorNames.end())
@@ -104,31 +66,37 @@ Result Listener::SetAcceptedHandler(const std::string& _listenerName, AcceptedHa
 		return EError::NotExistNetworkListener;
 	}
 
-	if (!_handler)
+	if (not _acceptedConfig.IsValid())
 	{
 		return EError::NeedAcceptedHandler;
 	}
 
-	{
-		SCOPED_WRITE_LOCK(m_accetorSettingMutex);
+	auto const index{ found->second };
+	auto& acceptorInfo{ m_acceptorInfos[index] };
 
-		if (m_acceptorInfos[found->second].acceptedHandler)
+	if (not acceptorInfo.acceptedConfig.Set(_acceptedConfig.acceptedHandler, _acceptedConfig.receivedHandler, _acceptedConfig.closedHandler))
+	{
+		return EError::AlreadySettedHandler;
+	}
+
+	//for(/* if want*/)
+	//{
+		asio::ip::tcp::socket* socket = new asio::ip::tcp::socket(*GetAsioContext());
+		const ConnectionId_t connId{ m_networkMoudle.MakeConnectionId() };
+		const ConnectionShared_t conn =
+			SocketConnectionImpl::Create(socket, connId, GetAsioContext(), acceptorInfo.isPublic, index, *this,
+				acceptorInfo.acceptedConfig.receivedHandler, acceptorInfo.acceptedConfig.closedHandler);
+
+		if (not AddConnection(conn))
 		{
-			return EError::AlreadySettedAcceptHandler;
+			return EError::FailedAddConnection;
 		}
 
-		m_acceptorInfos[found->second].acceptedHandler = _handler;
-	}
-
-	size_t concurrentAcceptCount = (std::max)(m_threadCount / m_acceptorNames.size(), (size_t)1);
-
-	for (size_t i = 0; i < concurrentAcceptCount; ++i)
-	{
-		ip::tcp::socket* socket = new ip::tcp::socket(m_ioContext);
-		ConnectionShared_t conn = ConnectionImpl::Create(socket, &m_ioContext, m_acceptorInfos[found->second].isPublic, found->second, this);
-
-		m_acceptorInfos[found->second].acceptor.async_accept(*socket, boost::bind(&Listener::OnAccepted, this, placeholders::error, socket, found->second, conn));
-	}
+		if (not IsShutdown())
+		{
+			m_acceptorInfos[found->second].acceptor.async_accept(*socket, std::bind(&Listener::OnAccepted, this, std::placeholders::_1, socket, found->second, conn));
+		}
+	//}
 
 	return EError::Success;
 }
@@ -141,13 +109,12 @@ void Listener::StopPublicListen(const std::string& _listenerName)
 		return;
 	}
 
-	if (!m_acceptorInfos[found->second].isPublic || !m_acceptorInfos[found->second].acceptor.is_open())
+	if (not m_acceptorInfos[found->second].isPublic || not m_acceptorInfos[found->second].acceptor.is_open())
 	{
 		return;
 	}
-	m_acceptorInfos[found->second].acceptor.cancel();
-	m_acceptorInfos[found->second].acceptor.close();
-	m_acceptorInfos[found->second].acceptor.release();
+	m_acceptorInfos[found->second].acceptor.cancel();	// refer to AcceptorInfo declare
+	m_acceptorInfos[found->second].acceptor.close();	// refer to AcceptorInfo declare
 }
 
 void Listener::ClosePublicConnection(const std::string& _listenerName)
@@ -161,30 +128,24 @@ void Listener::ClosePublicConnection(const std::string& _listenerName)
 	CloseAll(true, found->second);
 }
 
-void Listener::OnAccepted(const error_code& _error, ip::tcp::socket* _socket, const AcceptorIndex& _acceptorIndex, ConnectionShared_t _conn)
+void Listener::OnAccepted(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const AcceptorIndex& _acceptorIndex, ConnectionShared_t _conn)
 {
 	auto& acceptorInfo = m_acceptorInfos[_acceptorIndex];
 
 	Result result;
 	if (!_error)
 	{
-		ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
-
 		std::string remoteAddr = _socket->remote_endpoint().address().to_string();
 
-		ConnectionImpl* impl = static_cast<ConnectionImpl*>(_conn.get());
+		SocketConnectionImpl* impl = static_cast<SocketConnectionImpl*>(_conn.get());
 		impl->SetRemoteAddress(remoteAddr);
-		impl->SetConnectionId(connectionId);
 
-		bool handlerResult = acceptorInfo.acceptedHandler(result, _conn);
+		bool handlerResult = (*acceptorInfo.acceptedConfig.acceptedHandler)(result, _conn);
 
-		AddConnection(connectionId, _conn, acceptorInfo.isPublic);
-
-		if (!m_shutdown && handlerResult)
+		if (handlerResult)
 		{
 			impl->InitReceive();
-
-			Log("connected. connection id={}", connectionId);
+			Log("connected. connection id={}", _conn->GetConnectionId());
 		}
 		else
 		{
@@ -195,17 +156,26 @@ void Listener::OnAccepted(const error_code& _error, ip::tcp::socket* _socket, co
 	{
 		result = EError::FailedNetworkAccept;
 
-		acceptorInfo.acceptedHandler(result, nullptr);
+		(*acceptorInfo.acceptedConfig.acceptedHandler)(result, nullptr);
 
 		_conn->Close(result);
-		_conn.reset();
 	}
 
-	if (!m_shutdown && acceptorInfo.acceptor.is_open())
+	if (acceptorInfo.acceptor.is_open())
 	{
-		ip::tcp::socket* newSocket = new ip::tcp::socket(m_ioContext);
-		ConnectionShared_t newConn = ConnectionImpl::Create(newSocket, &m_ioContext, acceptorInfo.isPublic, _acceptorIndex, this);
+		asio::ip::tcp::socket* newSocket = new asio::ip::tcp::socket(*GetAsioContext());
 
-		acceptorInfo.acceptor.async_accept(*newSocket, boost::bind(&Listener::OnAccepted, this, placeholders::error, newSocket, _acceptorIndex, newConn));
+		const ConnectionId_t connId = m_networkMoudle.MakeConnectionId();
+		const ConnectionShared_t newConn =
+			SocketConnectionImpl::Create(newSocket, connId, GetAsioContext(), acceptorInfo.isPublic, _acceptorIndex, *this,
+				acceptorInfo.acceptedConfig.receivedHandler, acceptorInfo.acceptedConfig.closedHandler);
+
+		if (not AddConnection(newConn))
+		{
+			(*acceptorInfo.acceptedConfig.acceptedHandler)(Result(EError::FailedAddConnection, "failed to restart listen"), nullptr);
+			return;
+		}
+
+		acceptorInfo.acceptor.async_accept(*newSocket, std::bind(&Listener::OnAccepted, this, std::placeholders::_1, newSocket, _acceptorIndex, newConn));
 	}
 }

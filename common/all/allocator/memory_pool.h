@@ -5,7 +5,7 @@
 #define ADJUST_SIZE(s) ((s % ALIGNMENT != 0) ? (((s / ALIGNMENT) + 1) * ALIGNMENT) : s)
 #define MAKE_POOL_INDEX(ajs) ((ajs / ALIGNMENT) - 1)
 
-class MemoryPool
+class MemoryPool final
 {
 public:
 	MemoryPool()
@@ -14,29 +14,30 @@ public:
 	}
 	~MemoryPool()
 	{
-		auto threadCount = std::thread::hardware_concurrency();
+		const auto threadCount{ std::thread::hardware_concurrency() };
 
-		auto offset = POOL_COUNT / threadCount;
+		auto offset{ POOL_COUNT / threadCount };
 		std::vector<std::thread> freeThreads;
-		for (decltype(threadCount) i = 0; i < threadCount; ++i)
+		decltype(offset) start{};
+		for (std::remove_const_t<decltype(threadCount)> i{}; i < threadCount; ++i)
 		{
-			if (i + 1 == threadCount && POOL_COUNT % threadCount == 0)
+			if (i + 1 == threadCount && 0 != POOL_COUNT % threadCount)
 			{
 				offset += (POOL_COUNT % threadCount);
 			}
-			freeThreads.emplace_back([this, threadIndex = i, offset]()
+			freeThreads.emplace_back([this, start, offset]() mutable
 				{
-					auto start = threadIndex * offset;
-					auto end = (std::min)(start + offset, (decltype(start))POOL_COUNT);
+					const auto end = (std::min)(start + offset, (decltype(start))POOL_COUNT);
 					for (; start < end; ++start)
 					{
-						uint8_t* ptr = nullptr;
+						uint8_t* ptr{};
 						while (m_pools[start].try_pop(ptr))
 						{
 							free(ptr);
 						}
 					}
 				});
+			start += offset;
 		}
 
 		for (auto& th : freeThreads)
@@ -47,11 +48,11 @@ public:
 
 	uint8_t* allocate(const size_t _size)
 	{
-		uint8_t* ptr = nullptr;
-		if (_size > 0)
+		uint8_t* ptr{};
+		if (0 < _size)
 		{
-			auto adjustSize = ADJUST_SIZE(_size);
-			auto index = MAKE_POOL_INDEX(adjustSize);
+			const auto adjustSize{ ADJUST_SIZE(_size) };
+			const auto index{ MAKE_POOL_INDEX(adjustSize) };
 			if (index < POOL_COUNT)
 			{
 				if (!m_pools[index].try_pop(ptr))
@@ -70,10 +71,10 @@ public:
 
 	void deallocate(uint8_t* const _ptr, const size_t _size)
 	{
-		if (_ptr && _size > 0)
+		if (_ptr && 0 < _size)
 		{
-			auto adjustSize = ADJUST_SIZE(_size);
-			auto index = MAKE_POOL_INDEX(adjustSize);
+			const auto adjustSize{ ADJUST_SIZE(_size) };
+			const auto index{ MAKE_POOL_INDEX(adjustSize) };
 			if (index < POOL_COUNT)
 			{
 				m_pools[index].push(_ptr);

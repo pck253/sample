@@ -1,128 +1,204 @@
 #pragma once
 
-extern thread_local SerializedJobQueueShared_t g_currentSerializedJobQueue;
-
-class SerializedJobQueue : public std::enable_shared_from_this<SerializedJobQueue>
+class SerializedJobQueue : public std::enable_shared_from_this<SerializedJobQueue>, public UseShutdown
 {
-public:
-    using Job_t = std::function<void()>;
+    template<typename T>
+    struct ExtractSharedPtrInner;
 
-    template<class CT = SerializedJobQueue> requires std::derived_from<CT, SerializedJobQueue>
-    static std::shared_ptr<CT> Create(ThreadPool& _threadPool)
+    template<typename T>
+    struct ExtractSharedPtrInner<std::shared_ptr<T>>
     {
-        return std::shared_ptr<CT>(new CT(_threadPool));
+        using Type = T;
+    };
+
+    template<typename T>
+    struct ExtractSharedPtrInner<const std::shared_ptr<T>&>
+    {
+        using Type = T;
+    };
+
+    template<typename T>
+    struct ExtractSharedPtrInner<std::shared_ptr<T>&&>
+    {
+        using Type = T;
+    };
+
+public:
+    class IJobWrapper : public MemPoolInstance
+    {
+    public:
+        IJobWrapper() = default;
+        virtual ~IJobWrapper() = default;
+        virtual void operator ()(const std::shared_ptr<SerializedJobQueue>& _jobQueue) = 0;
+    };
+
+    template<typename T_FUNC>
+    class JobWrapper final : public IJobWrapper
+    {
+    public:
+        JobWrapper() = delete;
+        JobWrapper(T_FUNC&& _job) : m_job(std::move(_job)) {}
+        ~JobWrapper() = default;
+
+        void operator()(const std::shared_ptr<SerializedJobQueue>& _jobQueue) override
+        {
+            using DecayedFunc_t = std::remove_reference_t<T_FUNC>;
+            using ArgTypes_t = typename FunctionTraits<decltype(&DecayedFunc_t::operator())>::ArgTypes;
+
+            constexpr size_t count = std::tuple_size_v<ArgTypes_t>;
+            if constexpr (1 == count)
+            {
+                using Target_t = typename ExtractSharedPtrInner<std::tuple_element_t<0, ArgTypes_t>>::Type;
+
+                if constexpr (std::is_same_v<Target_t, SerializedJobQueue>)
+                {
+                    m_job(_jobQueue);
+                }
+                else
+                {
+                    m_job(_jobQueue->Get<Target_t>());
+                }
+            }
+            else
+            {
+                assert(false);
+            }
+        }
+    private:
+        T_FUNC m_job;
+    };
+
+    template<class T = SerializedJobQueue, typename... T_ARGS> requires std::derived_from<T, SerializedJobQueue>
+    static std::shared_ptr<T> Create(ThreadPool& _threadPool, T_ARGS&& ... _args)
+    {
+        auto instance = std::shared_ptr<T>(new T(_threadPool, std::forward<T_ARGS>(_args)...));
+        instance->m_isFromCreateFunc = true;
+        return instance;
     }
 
     virtual ~SerializedJobQueue()
     {
-        if (!m_jobQueue.empty())
+        if (!m_isFromCreateFunc)
         {
-            m_jobQueue.clear();
+            LogWarning("this was not created from \"Create\" function.");
+        }
+
+        IJobWrapper* job{};
+        while (m_jobQueue.try_pop(job))
+        {
+            delete job;
         }
     }
+
+    auto& GetThreadPool() { return m_threadPoolRef; }
 
     template<class T = SerializedJobQueue> requires std::derived_from<T, SerializedJobQueue>
     std::shared_ptr<T> Get()
     {
-        auto self = this->shared_from_this();
-        return std::shared_ptr<T>(std::move(self), static_cast<T*>(self.get()));
+        if constexpr (std::is_same<T, SerializedJobQueue>::value)
+        {
+            return this->shared_from_this();
+        }
+        return std::static_pointer_cast<T>(this->shared_from_this());
     }
-
-    inline void Shutdown() { m_shutdown = true; }
-    inline bool IsShutdown() { return m_shutdown; }
 
     void SetOnEmptyJob(std::function<void()>&& _onEmptyJob) { m_onEmptyJob = std::move(_onEmptyJob); }
 
-    void PushJob(Job_t&& _job)
+    template<typename T_FUNC>
+    void PushJob(T_FUNC&& _job)
     {
-        if (m_shutdown)
-        {
-            return;
-        }
-        m_jobQueue.push(std::move(_job));
+        // possible call PushJob after Shutdown.
+        // but, delete remain job in destructor.
+        m_jobQueue.push(new JobWrapper(std::move(_job)));
 
         auto old = m_jobCount.fetch_add(1);
         if (old == 0)
         {
-            if (m_pause)
-            {
-                return;
-            }
-            m_threadPool.PushJob([_self = Get()]()
+            m_threadPoolRef.PushJob([_self = Get()]()
             {
                 _self->ProcessJob();
             });
         }
     }
 
-    void ProcessJob()
+    void PushJob(IJobWrapper* _job)
     {
-        auto self = Get();
-
-        Job_t job;
-        if (m_jobQueue.try_pop(job))
+        if (nullptr == _job)
         {
-            g_currentSerializedJobQueue = self;
-            job();
-            g_currentSerializedJobQueue.reset();
-        }
-
-        auto old = m_jobCount.fetch_add(-1);
-        if (old != 1)   // if old is 1, current is 0.
-        {
-            if (m_pause)
-            {
-                return;
-            }
-            m_threadPool.PushJob([self]()
-            {
-                    self->ProcessJob();
-            });
-        }
-        else if (m_onEmptyJob)
-        {
-            m_onEmptyJob();
-        }
-    }
-
-    void Pause()
-    {
-        // this function is called in SerializedJobQueue::ProcessJob
-        bool expect = false;
-        if (this != g_currentSerializedJobQueue.get() || !m_pause.compare_exchange_strong(expect, true))
-        {
-            assert(this == g_currentSerializedJobQueue.get());
             return;
         }
+        // possible call PushJob after Shutdown.
+        // but, delete remain job in destructor.
+        m_jobQueue.push(_job);
 
-        // don't push calling SerializedJobQueue::ProcessJob job from SerializedJobQueue::PushJob called by other threads.
-        m_jobQueue.push([]() {});
-        m_jobCount.fetch_add(1);
-    }
-
-    void Resume()
-    {
-        bool expect = true;
-        if (m_pause.compare_exchange_strong(expect, false))
+        auto old = m_jobCount.fetch_add(1);
+        if (old == 0)
         {
-            m_threadPool.PushJob([_self = Get()]()
+            m_threadPoolRef.PushJob([_self = Get()]()
                 {
                     _self->ProcessJob();
                 });
         }
     }
 
+    void ProcessJob()
+    {
+        const auto shutdownMode{ m_shutdownMode.load()};
+        if (EShutdownMode::RightNow == shutdownMode || m_isStopProcessJob)
+        {
+            return;
+        }
+
+        const auto count{ m_jobCount.load() };
+        auto self{ Get() };
+
+        int32_t processed{};
+        IJobWrapper* job{};
+        for (const auto i : std::ranges::iota_view(0, count))
+        {
+            if (not m_jobQueue.try_pop(job))
+            {
+                continue;
+            }
+            ++processed;
+            (*job)(self);
+            delete job;
+        }
+        const auto old{ m_jobCount.fetch_add(-processed) };
+
+        m_isStopProcessJob = (EShutdownMode::CurrentJob == shutdownMode);
+        if (m_isStopProcessJob)
+        {
+            return;
+        }
+
+        if (old != count)   // if old is count, current is 0.
+        {
+            m_threadPoolRef.PushJob([jobQueue = std::move(Get())]()
+                {
+                    jobQueue->ProcessJob();
+                });
+            return;
+        }
+
+        m_isStopProcessJob = (EShutdownMode::EmptyJob == shutdownMode);
+        if (m_onEmptyJob)
+        {
+            m_onEmptyJob();
+        }
+    }
+
 protected:
-    SerializedJobQueue(ThreadPool& _threadPool)
-        : m_threadPool(_threadPool) {}
+    explicit SerializedJobQueue(ThreadPool& _threadPool) : m_threadPoolRef(_threadPool) {}
+
+    bool m_isFromCreateFunc{};
 
     std::function<void()> m_onEmptyJob;
 
-    std::atomic_bool m_shutdown = false;
-    ThreadPool& m_threadPool;
+    ThreadPool& m_threadPoolRef;
 
-    std::atomic_bool m_pause = false;
+    std::atomic_int32_t m_jobCount{ 0 };
+    Concurrency::concurrent_queue<IJobWrapper*> m_jobQueue;
 
-    std::atomic_int32_t m_jobCount = 0;
-    Concurrency::concurrent_queue<Job_t> m_jobQueue;
+    bool m_isStopProcessJob{};
 };

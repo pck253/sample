@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "code_gen": {
+      "commandName": "Project",
+      "commandLineArgs": "packet D:\\Data\\Code\\code_gen\\packet_definitions D:\\Data\\Code\\code_gen\\gen"
+    }
+  }
+}

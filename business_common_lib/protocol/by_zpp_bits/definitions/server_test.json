@@ -1,0 +1,9 @@
+{
+  "server": false,
+  "packets": [
+    {
+      "name": "Test",
+      "fields": [ { "type": "std::string", "name": "message", "isCustom": true } ]
+    }
+  ]
+}

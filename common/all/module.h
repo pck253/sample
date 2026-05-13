@@ -3,20 +3,21 @@
 enum class EModule : uint8_t
 {
 	None = 0,
-	Network = 1,
-	Restful = 2,
-	Timer = 3,
-	Server = 4,
-	TestClient = 5,
+	TestClient,
+	Server,
+	Network,
+	Web,
+	Timer,
 	Max
 };
 
 template <>
-struct std::formatter<EModule, char> : std::_Formatter_base<EModule, char, std::_Basic_format_arg_type::_Custom_type>
+struct std::formatter<EModule, char> : std::formatter<int, char>
 {
-	template <class _FormatContext>
-	auto format(const EModule& _Val, _FormatContext& _FormatCtx) const {
-		return std::format_to(_FormatCtx.out(), "{}", std::underlying_type_t<EModule>(_Val));
+	template <class FormatContext>
+	auto format(const EModule& _val, FormatContext& _formatCtx) const
+	{
+		return std::format_to(_formatCtx.out(), "{}", std::underlying_type_t<EModule>(_val));
 	}
 };
 
@@ -47,24 +48,44 @@ class Application;
 class Module
 {
 public:
-	virtual ~Module() = default;
+	static const char* GetModuleName(const EModule& _module)
+	{
+		switch (_module)
+		{
+		case EModule::TestClient:	return "TestClient";
+		case EModule::Server:	return "Server";
+		case EModule::Network:	return "Network";
+		case EModule::Web:		return "Web";
+		case EModule::Timer:	return "Timer";
+		default:				return "Unknown";
+		}
+	}
 
-	template<class T> requires std::derived_from<T, Module>
-	static Module* Create(const std::string& _configFilePath)
+public:
+	virtual ~Module()
+	{
+		SAFE_DELETE(m_accessor);
+	}
+
+	Module(const std::string& _configFilePath) : m_configFilePath(_configFilePath)
 	{
 		// -------------------------------------------------------------------
 		// module is singleton
 		// -------------------------------------------------------------------
-		std::call_once(m_onceFlag, [_configFilePath]() {
-				m_self = new T(_configFilePath);
-			});
+		bool expect = false;
+		if (!m_created.compare_exchange_strong(expect, true))
+		{
+			// forcly kill
+			int64_t* kill = 0;
+			*kill = 1;
+		}
 
-		return m_self;
-	}
+		m_self = this;
+		m_refLogger = &g_logger;
+	};
 
 	virtual bool IsBusinessModule() = 0;
 	virtual EModule GetModuleType() = 0;
-	virtual const char* GetModuleName() = 0;
 
 	template<class T = Module> requires std::derived_from<T, Module>
 	static T* Get()
@@ -74,7 +95,7 @@ public:
 
 	virtual Result Init()
 	{
-		m_refLogger->SetPrefix(GetModuleName());
+		m_refLogger->SetPrefix(GetModuleName(GetModuleType()));
 
 		std::ifstream f(m_configFilePath);
 
@@ -100,7 +121,7 @@ public:
 		if (!logConfig.is_null())
 		{
 			ELogLevel logLevel = ELogLevel::Error;
-			std::unordered_set<EDebugLogCategory> useDebugLogCategory;
+			std::unordered_set<ELogCategory> useDebugLogCategory;
 
 			auto levelConfig = logConfig["level"];
 			if (levelConfig.is_string())
@@ -139,10 +160,6 @@ public:
 	inline void SetLogHandler(LogHandler_t&& _logHandler) { m_refLogger->SetLogHandler(std::move(_logHandler)); }
 
 protected:
-	Module(const std::string& _configFilePath) : m_configFilePath(_configFilePath)
-	{
-		m_refLogger = &g_logger;
-	};
 
 	virtual Result InitImpl() = 0;
 	Application* GetApplication()
@@ -151,7 +168,9 @@ protected:
 	}
 
 protected:
-	static Module* m_self;
+	static inline std::atomic_bool m_created = false;
+	static inline Module* m_self = nullptr;
+
 	ModuleAccessor* m_accessor = nullptr;
 
 	nlohmann::json m_config;
@@ -160,11 +179,8 @@ protected:
 	Application* m_application = nullptr;
 
 	Logger* m_refLogger = nullptr;
-
-private:
-	static std::once_flag m_onceFlag;
 };
 
 #ifdef _USRDLL
-#include "../module/module_static_impl.h"
+#include "../module_impl/module_static_impl.h"
 #endif

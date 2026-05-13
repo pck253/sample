@@ -13,6 +13,9 @@
     <Filter Include="public">
       <UniqueIdentifier>{8d2b2320-0fd9-4dce-bc6d-99e9f219359d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="internal_module_network">
+      <UniqueIdentifier>{db05e387-eea7-43e7-bd9a-dc6f96d3b423}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="connecter\connecter.h">
@@ -29,7 +32,7 @@
     <ClInclude Include="connection\send_buffer.h">
       <Filter>connection</Filter>
     </ClInclude>
-    <ClInclude Include="connection\connection_impl.h">
+    <ClInclude Include="connection\socket_connection_impl.h">
       <Filter>connection</Filter>
     </ClInclude>
     <ClInclude Include="public\connection.h">
@@ -40,6 +43,12 @@
     </ClInclude>
     <ClInclude Include="network_accessor_impl.h" />
     <ClInclude Include="connection_manager.h" />
+    <ClInclude Include="connection\imn_connection_impl.h">
+      <Filter>connection</Filter>
+    </ClInclude>
+    <ClInclude Include="internal_module_network\internal_module_network.h">
+      <Filter>internal_module_network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="connecter\connecter.cpp">
@@ -57,12 +66,15 @@
     <ClCompile Include="connection\send_buffer.cpp">
       <Filter>connection</Filter>
     </ClCompile>
-    <ClCompile Include="connection\connection_impl.cpp">
+    <ClCompile Include="connection\socket_connection_impl.cpp">
       <Filter>connection</Filter>
     </ClCompile>
     <ClCompile Include="network_accessor_impl.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
+    <ClCompile Include="connection\imn_connection_impl.cpp">
+      <Filter>connection</Filter>
+    </ClCompile>
+    <ClCompile Include="internal_module_network\internal_module_network.cpp">
+      <Filter>internal_module_network</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

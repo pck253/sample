@@ -4,17 +4,17 @@ class Server : public Module
 {
     friend Module;
 public:
+    explicit Server(const std::string& _configFilePath);
     ~Server();
 
     virtual bool IsBusinessModule() final { return true; }
     virtual EModule GetModuleType() final { return EModule::Server; }
-    virtual const char* GetModuleName() final { return "Server"; }
 
     virtual void Shutdown() final;
 
     void ShutdownApplicationByRemote()
     {
-        GetApplication()->TryShutdown();
+        GetApplication()->Shutdown();
     }
 
     ServerId_t GetServerId() { return m_id; }
@@ -27,21 +27,18 @@ public:
     UserSessionShared_t FindUserSession(const ConnectionId_t& _connId);
     void ClosedUserSession(const Result& _result, const ConnectionId_t& _connId);
 
-    void PushJobToAllUserForDev(std::function<void(UserSessionShared_t&)>&& _job);
-
     ServerSessionShared_t ServerConnected(ConnectionShared_t _conn);
 
-    void CallRestfulHandler(const RestfulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, RestfulAccessor* _accessor);
+    void CallRestfulHandler(const RestufulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, WebAccessor* _accessor);
 
 private:
-    Server(const std::string& _configFilePath);
 
     virtual Result InitImpl() final;
     void InitRestfulHandlers();
 
 private:
-    ServerId_t m_id = INVALID_SERVER_ID;
-    ServerGroupId_t m_groupId = INVALID_SERVER_GROUP_ID;
+    ServerId_t m_id = ServerId_t::GetInvalidValue();
+    ServerGroupId_t m_groupId = ServerGroupId_t::GetInvalidValue();
 
     ThreadPool m_threadPool;
 
@@ -52,5 +49,5 @@ private:
 
     ServerSessionManager<ServerSession> m_serverSessionManager;
 
-    our::unordered_map<std::wstring, std::function<nlohmann::json(const RestfulParams&)>> m_restfulHandlers;
+    std::unordered_map<std::wstring, std::function<nlohmann::json(const WebParams&)>> m_restfulHandlers;
 };

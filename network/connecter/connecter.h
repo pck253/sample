@@ -1,25 +1,26 @@
 #pragma once
 
-// -------------------------------------------------------------
+static_assert(NETWORK_MODULE == 1);
 
 class Network;
 class Connecter : public ConnectionManager
 {
 public:
-	Connecter(Network* _networkMoudle);
+	using ConnectInfo = std::unordered_map<std::string, asio::ip::tcp::endpoint>;
+
+	explicit Connecter(Network* _networkMoudle);
 	virtual ~Connecter();
 
-	Result Init(const uint16_t& _threadCount, const nlohmann::json& _config);
-	void Shutdown();
+	Result Init(const uint16_t& _threadCount, ConnectInfo&& _connectInfos);
 
-	Result RequestConnect(const std::string& _address, const uint16_t& _port, ConnectedHandler_t&& _handler);
-	Result RequestConnect(const std::string& _connecterName, ConnectedHandler_t&& _handler, const uint16_t& _tryReconnectCount);
-
-private:
-	void OnConnected(const error_code& _error, ip::tcp::socket* _socket, ConnectedHandler_t& _handler, ConnectionShared_t _conn,
-		const std::string& _connecterName, const uint16_t& _tryReconnectCount);
+	Result RequestConnect(const std::string& _address, const uint16_t& _port, const ConnectedConfig& _connectedConfig);
+	Result RequestConnect(const std::string& _connecterName, const ConnectedConfig& _connectedConfig, const uint16_t& _tryReconnectCount);
 
 private:
-	nlohmann::json m_config;
+	void OnConnected(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const ConnectedConfig& _connectedConfig, const ConnectionShared_t& _conn,
+		const std::string& _connecterName, const uint16_t _tryReconnectCount);
+
+private:
+	ConnectInfo m_connectInfos;
 };
 

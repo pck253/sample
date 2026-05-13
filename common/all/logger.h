@@ -9,10 +9,12 @@ enum class ELogLevel : uint8_t
 	Max
 };
 
-enum class EDebugLogCategory : uint16_t
+enum class ELogCategory : uint16_t
 {
 	Network = 1,
-	Redis = 1,
+	Redis,
+	MsSql,
+	Nav,
 	Max
 };
 
@@ -27,9 +29,9 @@ public:
 	inline void SetPrefix(const std::string& _prefix) { m_prefix = _prefix; }
 
 	inline void SetLogHandler(LogHandler_t&& _logHandler) { m_logHandler = std::move(_logHandler); }
-	inline LogHandler_t& GetLogHandler() { return m_logHandler; }
+	inline const LogHandler_t& GetLogHandler() { return m_logHandler; }
 
-	void SetConfiguration(const ELogLevel& _logLevel, std::unordered_set<EDebugLogCategory>&& _useDebugLogCategory)
+	void SetConfiguration(const ELogLevel& _logLevel, std::unordered_set<ELogCategory>&& _useDebugLogCategory)
 	{
 		m_logLevel = _logLevel;
 		m_useDebugLogCategory = std::move(_useDebugLogCategory);
@@ -44,7 +46,7 @@ public:
 		m_logHandler(m_prefix.c_str(), _logLevel, _log);
 	}
 
-	inline bool IsUsingDebugLogCategory(const EDebugLogCategory& _debugCategory)
+	inline bool IsUsingDebugLogCategory(const ELogCategory& _debugCategory)
 	{
 		return (m_useDebugLogCategory.find(_debugCategory) != m_useDebugLogCategory.end());
 	}
@@ -55,7 +57,7 @@ private:
 	LogHandler_t m_logHandler;
 
 	ELogLevel m_logLevel = ELogLevel::Debug;
-	std::unordered_set<EDebugLogCategory> m_useDebugLogCategory;
+	std::unordered_set<ELogCategory> m_useDebugLogCategory;
 };
 
 extern Logger g_logger;

@@ -1,11 +1,14 @@
 #include "pch.h"
 
+static_assert(NETWORK_MODULE == 1);
+
 MODULE_STATIC_IMPL(Network);
 
 Network::Network(const std::string& _configFilePath)
 	: Module(_configFilePath),
 	m_listener(this),
-	m_connecter(this)
+	m_connecter(this),
+	m_imnManager(this)
 {
 	m_accessor = NetworkAccessorImpl::Create(this);
 }
@@ -31,26 +34,28 @@ Result Network::InitImpl()
 			threadCount = std::thread::hardware_concurrency();
 		}
 
-		our::vector<std::tuple<std::string, ip::tcp::endpoint, bool>> addresses;
+		std::vector<std::tuple<std::string, asio::ip::tcp::endpoint, bool>> addresses;
 		auto listen = listener["listen"];
 		if (listen.is_array())
 		{
-			auto listens = listen.get<our::vector<nlohmann::json>>();
+			auto listens = listen.get<std::vector<nlohmann::json>>();
 			for (auto& ls : listens)
 			{
 				auto name = ls["name"].get<std::string>();
-				auto ip = ls["ip"].get<std::string>();
-				auto port = ls["port"].get<uint16_t>();
-				auto isPublic = ls["public"].get<bool>();
+				auto isImn = ls["is imn"];
+				if (!isImn.is_null() && isImn.get<bool>())
+				{
+					m_redirectToImnInfos.emplace(name);
+				}
+				else
+				{
+					auto ip = ls["ip"].get<std::string>();
+					auto port = ls["port"].get<uint16_t>();
+					auto isPublic = ls["public"].get<bool>();
 
-				ip::tcp::endpoint endpoint(ip::address::from_string(ip), port);
-				addresses.push_back(std::make_tuple(name, endpoint, isPublic));
+					addresses.push_back(std::make_tuple(name, asio::ip::tcp::endpoint(asio::ip::make_address(ip), port), isPublic));
+				}
 			}
-		}
-
-		if (threadCount == 0 || addresses.empty())
-		{
-			return EError::InvalidConfig;
 		}
 
 		m_listener.Init(addresses, threadCount);
@@ -68,16 +73,40 @@ Result Network::InitImpl()
 
 		if (threadCount == 0)
 		{
-			return EError::InvalidConfig;
+			threadCount = std::thread::hardware_concurrency();
 		}
-		m_connecter.Init(threadCount, connecter["connect"]);
+
+		auto connect = connecter["connect"];
+		if (!connect.is_array())
+		{
+			return EError::NotExistConnectInfo;
+		}
+
+		std::unordered_map<std::string, asio::ip::tcp::endpoint> addresses;
+		auto connects = connect.get<std::vector<nlohmann::json>>();
+		for (auto& con : connects)
+		{
+			auto name = con["name"].get<std::string>();
+			auto foundImn = m_redirectToImnInfos.find(name);
+			if (m_redirectToImnInfos.end() == foundImn)
+			{
+				auto ip = con["ip"].get<std::string>();
+				auto port = con["port"].get<uint16_t>();
+
+				addresses.emplace(name, asio::ip::tcp::endpoint(asio::ip::make_address(ip), port));
+			}
+		}
+		m_connecter.Init(threadCount, std::move(addresses));
 	}
+
+	m_imnManager.Init(m_redirectToImnInfos, 3);
 
 	return EError::Success;
 }
 
 void Network::Shutdown()
 {
-	m_listener.Shutdown();
-	m_connecter.Shutdown();
+	m_listener.Shutdown(EShutdownMode::EmptyJob, "listener shutdown.");
+	m_connecter.Shutdown(EShutdownMode::EmptyJob, "connecter shutdown.");
+	m_imnManager.Shutdown(EShutdownMode::EmptyJob, "internal module network shutdown.");
 }

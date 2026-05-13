@@ -1,138 +1,101 @@
 #include "pch.h"
 
-// -------------------------------------------------------------
+static_assert(NETWORK_MODULE == 1);
 
 Connecter::Connecter(Network* _networkMoudle)
-	: ConnectionManager(_networkMoudle)
+	: ConnectionManager(_networkMoudle, EThreadPool::ASIO)
 {
+	m_afterShutdown = [this]()
+		{
+			m_connectInfos.clear();
+
+			CloseAllAndWait(false);
+
+			ShutdownThreadPool();
+
+			Log("Shutdown Connecter");
+		};
 }
 
 Connecter::~Connecter()
 {
-	SAFE_DELETE(m_workGuard);
 }
 
-Result Connecter::Init(const uint16_t& _threadCount, const nlohmann::json& _config)
+Result Connecter::Init(const uint16_t& _threadCount, ConnectInfo&& _connectInfos)
 {
-	m_config = _config;
-	m_threadCount = _threadCount;
+	m_connectInfos = std::move(_connectInfos);
 
-	m_workGuard = new WorkGuard_t(m_ioContext.get_executor());
-	for (uint16_t i = 0; i < m_threadCount; ++i)
-	{
-		m_threads.emplace_back([this]()
-			{
-				Log("Connecter m_ioContext run.");
-				m_ioContext.run();
-				Log("Connecter thread stop.");
-			});
-	}
+	InitThreadPool(_threadCount);
 
 	return EError::Success;
 }
 
-void Connecter::Shutdown()
+Result Connecter::RequestConnect(const std::string& _address, const uint16_t& _port, const ConnectedConfig& _connectedConfig)
 {
-	m_shutdown = true;
+	asio::ip::tcp::socket* socket = new asio::ip::tcp::socket(*GetAsioContext());
+	ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
+	ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler, _connectedConfig.closedHandler);
 
-	CloseAll(false);
-
-	do
+	if (not AddConnection(conn))
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	} while (!IsEmptyConnection(false));
-
-	if (m_workGuard)
-	{
-		m_workGuard->reset();
+		return EError::FailedAddConnection;
 	}
 
-	for (auto& thread : m_threads)
-	{
-		thread.join();
-	}
-
-	if (!IsEmptyConnection(false))
-	{
-		LogWarning("Remain Connection");
-	}
-
-	m_ioContext.stop();
-	while (!m_ioContext.stopped());
-
-	Log("Shutdown Connecter");
-}
-
-Result Connecter::RequestConnect(const std::string& _address, const uint16_t& _port, ConnectedHandler_t&& _handler)
-{
-	ip::tcp::socket* socket = new ip::tcp::socket(m_ioContext);
-	ConnectionShared_t conn = ConnectionImpl::Create(socket, &m_ioContext, false, NOT_FROM_ACCEPTOR, this);
-
-	ip::tcp::endpoint endpoint(ip::address::from_string(_address.c_str()), _port);
-	socket->async_connect(endpoint, boost::bind(&Connecter::OnConnected, this, placeholders::error, socket, std::move(_handler), conn, "", 0));
-
+	asio::ip::tcp::endpoint endpoint(asio::ip::make_address(_address), _port);
+	socket->async_connect(endpoint, std::bind(&Connecter::OnConnected, this, std::placeholders::_1, socket, _connectedConfig, conn, "", 0));
 
 	return EError::Success;
 }
 
-Result Connecter::RequestConnect(const std::string& _connecterName, ConnectedHandler_t&& _handler, const uint16_t& _tryReconnectCount)
+Result Connecter::RequestConnect(const std::string& _connecterName, const ConnectedConfig& _connectedConfig, const uint16_t& _tryReconnectCount)
 {
-	if (!m_config.is_array())
+	if (m_connectInfos.empty())
 	{
 		return EError::NotExistConnectInfo;
 	}
 
-	if (!_handler)
+	if (not _connectedConfig.IsValid())
 	{
 		return EError::NeedConnectedHandler;
 	}
 
-	auto connects = m_config.get<our::vector<nlohmann::json>>();
-	for (auto& con : connects)
+	auto found = m_connectInfos.find(_connecterName);
+	if (m_connectInfos.end() == found)
 	{
-		auto name = con["name"].get<std::string>();
-		if (name != _connecterName)
-		{
-			continue;
-		}
-		auto ip = con["ip"].get<std::string>();
-		auto port = con["port"].get<uint16_t>();
-
-		ip::tcp::endpoint endpoint(ip::address::from_string(ip), port);
-
-		ip::tcp::socket* socket = new ip::tcp::socket(m_ioContext);
-		ConnectionShared_t conn = ConnectionImpl::Create(socket, &m_ioContext, false, NOT_FROM_ACCEPTOR, this);
-
-		socket->async_connect(endpoint, boost::bind(&Connecter::OnConnected, this, placeholders::error, socket, std::move(_handler), conn, name, _tryReconnectCount));
-
-		return EError::Success;
+		return EError::NotExistConnectInfo;
 	}
 
-	return EError::NotExistConnectInfo;
+	asio::ip::tcp::socket* socket = new asio::ip::tcp::socket(*GetAsioContext());
+	ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
+	ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler, _connectedConfig.closedHandler);
+
+	if (not AddConnection(conn))
+	{
+		return EError::FailedAddConnection;
+	}
+
+	socket->async_connect(found->second, std::bind(&Connecter::OnConnected, this, std::placeholders::_1, socket, _connectedConfig, conn, _connecterName, _tryReconnectCount));
+
+	return EError::Success;
 }
 
-void Connecter::OnConnected(const error_code& _error, ip::tcp::socket* _socket, ConnectedHandler_t& _handler, ConnectionShared_t _conn,
-	const std::string& _connecterName, const uint16_t& _tryReconnectCount)
+void Connecter::OnConnected(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const ConnectedConfig& _connectedConfig, const ConnectionShared_t& _conn,
+	const std::string& _connecterName, const uint16_t _tryReconnectCount)
 {
 	Result result;
 	if (!_error)
 	{
-		ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
-
 		std::string remoteAddr = _socket->remote_endpoint().address().to_string();
 
-		ConnectionImpl* impl = static_cast<ConnectionImpl*>(_conn.get());
+		SocketConnectionImpl* impl = static_cast<SocketConnectionImpl*>(_conn.get());
 		impl->SetRemoteAddress(remoteAddr);
-		impl->SetConnectionId(connectionId);
-		bool handlerResult = _handler(result, _connecterName, _conn);
+		bool handlerResult = (*_connectedConfig.connectedHandler)(result, _connecterName, _conn);
 
-		AddConnection(connectionId, _conn, _conn->IsPublic());
-
-		if (!m_shutdown && handlerResult)
+		if (handlerResult)
 		{
 			impl->InitReceive();
 
-			Log("connected. connection id={}", connectionId);
+			Log("connected. connection id={}", _conn->GetConnectionId());
 		}
 		else
 		{
@@ -143,15 +106,17 @@ void Connecter::OnConnected(const error_code& _error, ip::tcp::socket* _socket, 
 	{
 		if (_tryReconnectCount > 0)
 		{
-			RequestConnect(_connecterName, std::move(_handler), _tryReconnectCount - 1);
 			Log("try reconnect");
-			return;
+			if (RequestConnect(_connecterName, _connectedConfig, _tryReconnectCount - 1) == EError::Success)
+			{
+				return;
+			}
+			LogError("falied to try reconnect");
 		}
 
 		result = EError::FailedNetworkConnect;
 		_conn->Close(result);
-		_conn.reset();
 
-		_handler(result, _connecterName, _conn);
+		(*_connectedConfig.connectedHandler)(result, _connecterName, nullptr);
 	}
 }

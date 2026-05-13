@@ -122,12 +122,13 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;NETWORK_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\asio-1.38.0\include\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -143,12 +144,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;NETWORK_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\asio-1.38.0\include\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -159,11 +161,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="connection\connection_impl.h" />
+    <ClInclude Include="connection\imn_connection_impl.h" />
+    <ClInclude Include="connection\socket_connection_impl.h" />
     <ClInclude Include="connection\receive_buffer.h" />
     <ClInclude Include="connection\send_buffer.h" />
     <ClInclude Include="connecter\connecter.h" />
     <ClInclude Include="connection_manager.h" />
+    <ClInclude Include="internal_module_network\internal_module_network.h" />
     <ClInclude Include="listener\listener.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="network_accessor_impl.h" />
@@ -172,11 +176,13 @@
     <ClInclude Include="public\network_accessor.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="connection\connection_impl.cpp" />
+    <ClCompile Include="connection\imn_connection_impl.cpp" />
+    <ClCompile Include="connection\socket_connection_impl.cpp" />
     <ClCompile Include="connection\receive_buffer.cpp" />
     <ClCompile Include="connection\send_buffer.cpp" />
     <ClCompile Include="connecter\connecter.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="internal_module_network\internal_module_network.cpp" />
     <ClCompile Include="listener\listener.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="network_accessor_impl.cpp" />
@@ -187,17 +193,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\packages\boost.1.81.0\build\boost.targets" Condition="Exists('..\packages\boost.1.81.0\build\boost.targets')" />
-  </ImportGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>이 프로젝트는 이 컴퓨터에 없는 NuGet 패키지를 참조합니다. 해당 패키지를 다운로드하려면 NuGet 패키지 복원을 사용하십시오. 자세한 내용은 http://go.microsoft.com/fwlink/?LinkID=322105를 참조하십시오. 누락된 파일은 {0}입니다.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\boost.1.81.0\build\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost.1.81.0\build\boost.targets'))" />
-  </Target>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>

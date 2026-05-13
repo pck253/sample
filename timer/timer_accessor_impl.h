@@ -1,5 +1,7 @@
 #pragma once
 
+static_assert(TIMER_MODULE == 1);
+
 class Timer;
 class TimerAccessorImpl : public TimerAccessor
 {
@@ -10,10 +12,10 @@ public:
 	}
 	~TimerAccessorImpl() = default;
 
-	virtual TimerTickerShared_t AllocTimerTicker(const std::chrono::milliseconds& _timerResolution, OnTimeHandler_t&& _onTimeHandler) final;
+	virtual TimerJobManagerShared_t AllocateTimerJobManager(ThreadPool& _threadPool) final;
 
 private:
-	TimerAccessorImpl(Timer* _timerModule) : m_timerModule(*_timerModule) {};
+	explicit TimerAccessorImpl(Timer* _timerModule) : m_timerModule(*_timerModule) {};
 
 	Timer& m_timerModule;
 };

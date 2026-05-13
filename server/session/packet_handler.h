@@ -1,12 +1,12 @@
 #pragma once
 
 // --------------- client to server ----------------------------
-bool Handler(UserSessionShared_t& _user, const Client::TestMessage* _packetBody, our::vector<uint8_t>&& _rawData);
+bool Handler(UserSessionShared_t& _user, Client::TestMessage&& _packet);
 
 // --------------- server common ----------------------------
-bool Handler(ServerSessionShared_t& _server, const ServerCommon::Activation* _packetBody, our::vector<uint8_t>&& _rawData);
-bool Handler(ServerSessionShared_t& _server, const ServerCommon::Shutdown* _packetBody, our::vector<uint8_t>&& _rawData);
+bool Handler(ServerSessionShared_t& _server, ServerCommon::Activation&& _packet);
+bool Handler(ServerSessionShared_t& _server, ServerCommon::Shutdown&& _packet);
 
 // --------------- server to server ----------------------------
-bool Handler(ServerSessionShared_t& _server, const ServerTest::Test* _packetBody, our::vector<uint8_t>&& _rawData);
+bool Handler(ServerSessionShared_t& _server, ServerTest::Test&& _packet);
 

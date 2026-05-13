@@ -1,0 +1,328 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{696E479B-15DB-3AF9-8820-F782B8522F12}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>libcurl_shared</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)$(LibrariesArchitecture)\debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)$(LibrariesArchitecture)\debug\temp</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">libcurl</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)$(LibrariesArchitecture)\release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)$(LibrariesArchitecture)\release\temp</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">libcurl</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\PCK\Downloads\curl-8.5.0\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib;C:\Users\PCK\Downloads\curl-8.5.0\build\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;CURL_HIDDEN_SYMBOLS;HAVE_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_LIBCURL;CURL_STATICLIB;CMAKE_INTDIR="Debug";libcurl_shared_EXPORTS</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;CURL_EMBED_MANIFEST;_DEBUG;_WINDOWS;CURL_HIDDEN_SYMBOLS;HAVE_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_LIBCURL;CURL_STATICLIB;CMAKE_INTDIR=\"Debug\";libcurl_shared_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PorjectDir)include;$(PorjectDir)lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\PCK\Downloads\curl-8.5.0\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib;C:\Users\PCK\Downloads\curl-8.5.0\build\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>ws2_32.lib;bcrypt.lib;wldap32.lib;advapi32.lib;crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;libcrypto_static.lib;libssl_static.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\Data\Code\OpenSSL-Win64\lib\VC\x64\MTd;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>$(ProjectDir)$(LibrariesArchitecture)\debug\libcurl_load.lib</ImportLibrary>
+      <ModuleDefinitionFile>$(ProjectDir)libcurl.def</ModuleDefinitionFile>
+      <ProgramDataBaseFile>$(ProjectDir)$(LibrariesArchitecture)\debug\libcurl.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\PCK\Downloads\curl-8.5.0\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib;C:\Users\PCK\Downloads\curl-8.5.0\build\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;CURL_HIDDEN_SYMBOLS;HAVE_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_LIBCURL;CURL_STATICLIB;CMAKE_INTDIR="Release";libcurl_shared_EXPORTS</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;CURL_EMBED_MANIFEST;_WINDOWS;NDEBUG;CURL_HIDDEN_SYMBOLS;HAVE_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_LIBCURL;CURL_STATICLIB;CMAKE_INTDIR=\"Release\";libcurl_shared_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PorjectDir)include;$(PorjectDir)lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\PCK\Downloads\curl-8.5.0\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib\..\include;C:\Users\PCK\Downloads\curl-8.5.0\build\lib\..;C:\Users\PCK\Downloads\curl-8.5.0\lib;C:\Users\PCK\Downloads\curl-8.5.0\build\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>ws2_32.lib;bcrypt.lib;wldap32.lib;advapi32.lib;crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;libcrypto_static.lib;libssl_static.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\Data\Code\OpenSSL-Win64\lib\VC\x64\MT;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>$(ProjectDir)$(LibrariesArchitecture)\release\libcurl_load.lib</ImportLibrary>
+      <ModuleDefinitionFile>$(ProjectDir)libcurl.def</ModuleDefinitionFile>
+      <ProgramDataBaseFile>$(ProjectDir)$(LibrariesArchitecture)\release\libcurl.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\altsvc.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\amigaos.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\asyn-ares.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\asyn-thread.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\base64.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\bufq.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\bufref.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\c-hyper.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cf-h1-proxy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cf-h2-proxy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cf-haproxy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cf-https-connect.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cf-socket.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cfilters.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\conncache.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\connect.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\content_encoding.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cookie.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_addrinfo.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_des.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_endian.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_fnmatch.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_get_line.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_gethostname.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_gssapi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_memrchr.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_multibyte.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_ntlm_core.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_ntlm_wb.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_path.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_range.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_rtmp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_sasl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_threads.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_trc.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\dict.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\doh.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\dynbuf.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\dynhds.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\easy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\easygetopt.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\easyoptions.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\escape.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\file.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\fileinfo.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\fopen.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\formdata.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ftp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ftplistparser.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\getenv.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\getinfo.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\gopher.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hash.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\headers.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hmac.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostasyn.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostip.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostip4.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostip6.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostsyn.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hsts.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http1.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http2.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_aws_sigv4.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_chunks.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_digest.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_negotiate.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_ntlm.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\http_proxy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\idn.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\if2ip.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\imap.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\inet_ntop.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\inet_pton.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\krb5.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ldap.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\llist.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\macos.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\md4.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\md5.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\memdebug.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\mime.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\mprintf.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\mqtt.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\multi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\netrc.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\nonblock.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\noproxy.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\openldap.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\parsedate.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\pingpong.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\pop3.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\progress.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\psl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\rand.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\rename.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\rtsp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\select.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\sendf.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\setopt.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\sha256.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\share.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\slist.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\smb.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\smtp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\socketpair.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\socks.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\socks_gssapi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\socks_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\speedcheck.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\splay.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\strcase.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\strdup.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\strerror.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\strtok.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\strtoofft.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\system_win32.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\telnet.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\tftp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\timediff.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\timeval.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\transfer.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\url.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\urlapi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\version.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\version_win32.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\warnless.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ws.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cleartext.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\cram.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\digest.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\digest_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\gsasl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\krb5_gssapi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\krb5_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ntlm.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\ntlm_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\oauth2.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\spnego_gssapi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\spnego_sspi.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\vauth.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\bearssl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\gtls.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\hostcheck.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\keylog.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\mbedtls.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\mbedtls_threadlock.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\openssl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\rustls.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\schannel.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\schannel_verify.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\sectransp.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\vtls.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\wolfssl.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\x509asn1.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_msh3.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_ngtcp2.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\curl_quiche.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\vquic.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\libssh.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\libssh2.obj" />
+    <Object Include="$(ProjectDir)$(LibrariesArchitecture)\$(Configuration)\temp\wolfssh.obj" />
+    <ResourceCompile Include="$(ProjectDir)libcurl.rc" />
+    <None Include="$(ProjectDir)\libcurl.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="libcurl_object.vcxproj">
+      <Project>{8d01e817-95c3-32ca-82e5-25f2a857f0d3}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

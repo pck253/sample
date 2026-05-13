@@ -28,7 +28,6 @@ unsigned int __stdcall CreateMiniDump(void* _exceptionInfo)
 		static_cast<int>(currTm.tm_hour),
 		static_cast<int>(currTm.tm_min));
 
-	// Create the file
 	HANDLE hFile = CreateFile(
 		dumpPath,
 		GENERIC_WRITE,
@@ -66,7 +65,7 @@ LONG UnhandledExceptionHandler(PEXCEPTION_POINTERS _exception)
 {
 	ExceptionInfo info = { ::GetCurrentThreadId(), _exception };
 
-	if (_exception != nullptr && _exception->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW)
+	if (_exception != nullptr && EXCEPTION_STACK_OVERFLOW == _exception->ExceptionRecord->ExceptionCode)
 	{
 		auto hThread = _beginthreadex(0, 0, CreateMiniDump, &info, 0, nullptr);
 		if (hThread != 0)
@@ -124,7 +123,7 @@ public:
 			SAFE_DELETE(module.second);
 		}
 
-		for (auto& dllHandler : m_dllHandlers)
+		for (auto& [dllHandler, isBusiness] : m_dllHandlers)
 		{
 			FreeLibrary(dllHandler);
 		}
@@ -157,20 +156,20 @@ public:
 
 		std::filesystem::path configRootPath;
 		{
-			auto application = m_config["application"];
+			const auto application = m_config["application"];
 			if (application.is_null())
 			{
 				LogError("not exist application config data.");
 				return EError::InvalidConfig;
 			}
 
-			auto name = application["name"];
+			const auto name = application["name"];
 			if (name.is_string())
 			{
 				SetConsoleTitle(name.get<std::string>().c_str());
 			}
 
-			auto configRoot = application["config root"];
+			const auto configRoot = application["config root"];
 			if (!configRoot.is_string())
 			{
 				LogError("not exist config root data.");
@@ -188,6 +187,24 @@ public:
 				LogError("config root path : {}", _ex.what());
 				return EError::InvalidConfig;
 			}
+
+			const auto resourceRoot = application["resource root"];
+			if (!resourceRoot.is_string())
+			{
+				LogError("not exist config root data.");
+				return EError::InvalidConfig;
+			}
+
+			const auto resourceRootPath = resourceRoot.get<std::string>();
+			try
+			{
+				m_resourceRootPath = std::filesystem::canonical(resourceRootPath).generic_string() + "/";
+			}
+			catch (std::exception& _ex)
+			{
+				LogError("resource root path : {}", _ex.what());
+				return EError::InvalidConfig;
+			}
 		}
 
 		auto modules = m_config["modules"];
@@ -197,15 +214,15 @@ public:
 			return EError::InvalidConfig;
 		}
 
-		auto moduleConfigs = modules.get<our::vector<nlohmann::json>>();
-		for (auto& moduleConfig : moduleConfigs)
+		const auto moduleConfigs = modules.get<std::vector<nlohmann::json>>();
+		for (const auto& moduleConfig : moduleConfigs)
 		{
 			if (!moduleConfig["use"].get<bool>())
 			{
 				continue;
 			}
 
-			std::string dll = moduleConfig["dll"].get<std::string>();
+			const std::string dll = moduleConfig["dll"].get<std::string>();
 
 			std::filesystem::path configPath = configRootPath;
 			configPath += moduleConfig["config"].get<std::string>();
@@ -226,11 +243,11 @@ public:
 				LogError("failed to load module dll : {}", dll.c_str());
 				return EError::InvalidDll;
 			}
-			m_dllHandlers.push_back(h);
 
 			CreateModuleFunc_t createModuleFunc = (CreateModuleFunc_t)GetProcAddress(h, "CreateModule");
 			if (!createModuleFunc)
 			{
+				FreeLibrary(h);
 				LogError("CreateModule function is null : {}", dll.c_str());
 				return EError::FailedCreateModule;
 			}
@@ -238,16 +255,20 @@ public:
 			auto module = (*createModuleFunc)(configPath.generic_string().c_str(), g_memoryPool);
 			if (!module)
 			{
+				FreeLibrary(h);
 				LogError("failed to create module : {}", dll.c_str());
 				return EError::FailedCreateModule;
 			}
 
 			if (!AddModule(module))
 			{
-				LogError("failed to add module : {}", dll.c_str());
+				FreeLibrary(h);
 				SAFE_DELETE(module);
+				LogError("failed to add module : {}", dll.c_str());
 				return EError::DuplicatedModule;
 			}
+
+			m_dllHandlers.push_back(std::make_pair(h, module->IsBusinessModule()));
 		}
 
 		if (m_modules.empty())
@@ -270,9 +291,9 @@ public:
 			}
 
 			result = module.second->Init();
-			if (result != EError::Success)
+			if (!result)
 			{
-				LogError("failed to init business module : {}, {}", module.second->GetModuleName(), result);
+				LogError("failed to init business module : {}, {}", Module::GetModuleName(module.second->GetModuleType()), result);
 				return result;
 			}
 		}
@@ -291,56 +312,14 @@ public:
 			}
 
 			result = module.second->Init();
-			if (result != EError::Success)
+			if (!result)
 			{
-				LogError("failed to init common module : {}, {}", module.second->GetModuleName(), result);
+				LogError("failed to init common module : {}, {}", Module::GetModuleName(module.second->GetModuleType()), result);
 				return result;
 			}
 		}
 
 		return result;
-	}
-
-	virtual void ShutdownBusiness()
-	{
-		our::vector<std::thread> threads;
-		for (auto& module : m_modules)
-		{
-			if (!module.second->IsBusinessModule())
-			{
-				continue;
-			}
-			threads.emplace_back([_module = module.second]()
-				{
-					_module->Shutdown();
-				});
-		}
-
-		for (auto& thread : threads)
-		{
-			thread.join();
-		}
-	}
-
-	virtual void ShutdownCommon()
-	{
-		our::vector<std::thread> threads;
-		for (auto& module : m_modules)
-		{
-			if (module.second->IsBusinessModule())
-			{
-				continue;
-			}
-			threads.emplace_back([_module = module.second]()
-				{
-					_module->Shutdown();
-				});
-		}
-
-		for (auto& thread : threads)
-		{
-			thread.join();
-		}
 	}
 
 	Module* GetModule(const EModule& _moduleType)
@@ -349,7 +328,10 @@ public:
 		return (found == m_modules.end()) ? nullptr : found->second;
 	}
 
-	void TryShutdown() { m_shutdown = true; }
+
+	const auto& GetResourceRootPath() const { return m_resourceRootPath; }
+
+	void Shutdown() { m_shutdown = true; }
 
 	bool IsShutdown() { return m_shutdown; }
 
@@ -366,13 +348,56 @@ protected:
 		return ret.second;
 	}
 
+	virtual void ShutdownBusiness()
+	{
+		std::vector<std::thread> threads;
+		for (auto& [moduleType, module] : m_modules)
+		{
+			if (!module || !module->IsBusinessModule())
+			{
+				continue;
+			}
+			threads.emplace_back([_module = module]()
+				{
+					_module->Shutdown();
+				});
+		}
+
+		for (auto& thread : threads)
+		{
+			thread.join();
+		}
+	}
+
+	virtual void ShutdownCommon()
+	{
+		std::vector<std::thread> threads;
+		for (auto& [moduleType, module] : m_modules)
+		{
+			if (!module || module->IsBusinessModule())
+			{
+				continue;
+			}
+			threads.emplace_back([_module = module]()
+				{
+					_module->Shutdown();
+				});
+		}
+
+		for (auto& thread : threads)
+		{
+			thread.join();
+		}
+	}
+
 protected:
 	MemoryPool m_memoryPool;
 
 	std::atomic_bool m_shutdown = false;
 
 	nlohmann::json m_config;
+	std::string m_resourceRootPath;
 
 	Modules_t m_modules;
-	std::vector<HINSTANCE> m_dllHandlers;
+	std::vector<std::pair<HINSTANCE, bool>> m_dllHandlers;
 };

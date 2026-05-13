@@ -118,14 +118,25 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)network\;$(SolutionDir)sdk\flatbuffers-23.1.21\include\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)network\;$(SolutionDir)sdk\zpp_bits\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)code_gen\bin\Release\net8.0\code_gen.exe packet $(ProjectDir)protocol\by_zpp_bits\definitions $(ProjectDir)protocol\by_zpp_bits</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>codegen</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -137,8 +148,9 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)network\;$(SolutionDir)sdk\flatbuffers-23.1.21\include\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)network\;$(SolutionDir)sdk\zpp_bits\;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -147,14 +159,26 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <Lib>
+      <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)code_gen\bin\Release\net8.0\code_gen.exe packet $(ProjectDir)protocol\by_zpp_bits\definitions $(ProjectDir)protocol\by_zpp_bits</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="business_common.h" />
+    <ClInclude Include="business_common_alias.h" />
+    <ClInclude Include="business_common_definition.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="protocol\by_flatbuffer\client_generated.h" />
-    <ClInclude Include="protocol\by_flatbuffer\server_common_generated.h" />
-    <ClInclude Include="protocol\by_flatbuffer\server_generated.h" />
-    <ClInclude Include="protocol\flat_buffer_packet_handler.h" />
+    <ClInclude Include="protocol\by_zpp_bits\base.h" />
+    <ClInclude Include="protocol\by_zpp_bits\client.h" />
+    <ClInclude Include="protocol\by_zpp_bits\server_common.h" />
+    <ClInclude Include="protocol\by_zpp_bits\server_test.h" />
+    <ClInclude Include="protocol\zpp_bits_packet_handler.h" />
     <ClInclude Include="server_session_base.h" />
   </ItemGroup>
   <ItemGroup>
@@ -166,10 +190,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="protocol\by_flatbuffer\client.fbs" />
-    <None Include="protocol\by_flatbuffer\server.fbs" />
-    <None Include="protocol\by_flatbuffer\server_common.fbs" />
-    <None Include="protocol\by_flatbuffer\server_test.fbs" />
+    <None Include="protocol\by_zpp_bits\definitions\client.json" />
+    <None Include="protocol\by_zpp_bits\definitions\server_common.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

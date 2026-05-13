@@ -1,6 +1,9 @@
 #include "pch.h"
 
-TimerTickerShared_t TimerAccessorImpl::AllocTimerTicker(const std::chrono::milliseconds& _timerResolution, OnTimeHandler_t&& _onTimeHandler)
+static_assert(TIMER_MODULE == 1);
+
+TimerJobManagerShared_t TimerAccessorImpl::AllocateTimerJobManager(ThreadPool& _threadPool)
 {
-	return m_timerModule.AllocTimerTicker(_timerResolution, std::move(_onTimeHandler));
+	// std::chrono::milliseconds(16) : temp value
+	return m_timerModule.GetTimerJobManagerAllocator().AllocTimerJobManager(std::chrono::milliseconds(16), _threadPool)->Get();
 }

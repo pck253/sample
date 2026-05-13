@@ -1,11 +1,13 @@
 #include "pch.h"
 
+static_assert(NETWORK_MODULE == 1);
+
 ReceiveBuffer::ReceiveBuffer()
 	: m_buffer(MAX_PACKET_SIZE * 2, 0), m_freeSize(MAX_PACKET_SIZE * 2)
 {
 }
 
-void ReceiveBuffer::Read(our::vector<uint8_t>& _output)
+void ReceiveBuffer::Read(std::vector<uint8_t>& _output)
 {
 	auto readableSize = m_buffer.size() - m_freeSize;
 	if (readableSize <= PACKET_SIZE_BYTE)

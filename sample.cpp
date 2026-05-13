@@ -1,7 +1,7 @@
 ﻿
 #include "common.h"
 
-MemoryPool* g_memoryPool = nullptr;
+MemoryPool* g_memoryPool{};
 Logger g_logger;
 StartTime g_startTime;
 

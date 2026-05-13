@@ -10,9 +10,9 @@ struct Vector2d
 	T y = 0;
 
 	Vector2d() = default;
-	Vector2d(const T& _x, const T& _y) : x(_x), y(_y) {}
-	Vector2d(const Vector2d& _other) : x(_other.x), y(_other.y) {}
-	Vector2d(Vector2d&& _other) : x(_other.x), y(_other.y) { _other.x = 0; _other.y = 0; }
+	explicit Vector2d(const T& _x, const T& _y) : x(_x), y(_y) {}
+	explicit Vector2d(const Vector2d& _other) : x(_other.x), y(_other.y) {}
+	explicit Vector2d(Vector2d&& _other) noexcept : x(_other.x), y(_other.y) { _other.x = 0; _other.y = 0; }
 
 	Vector2d& operator=(const Vector2d& _other)
 	{
@@ -20,7 +20,7 @@ struct Vector2d
 		y = _other.y;
 		return *this;
 	}
-	Vector2d& operator=(Vector2d&& _other)
+	Vector2d& operator=(Vector2d&& _other) noexcept
 	{
 		x = _other.x;
 		y = _other.y;
@@ -29,38 +29,38 @@ struct Vector2d
 		return *this;
 	}
 
-	bool operator!=(const Vector2d<T>_other)
+	bool operator!=(const Vector2d<T>_other) const
 	{
 		return (x != _other.x || y != _other.y);
 	}
-	bool operator==(const Vector2d<T>& _other)
+	bool operator==(const Vector2d<T>& _other) const
 	{
 		return (x == _other.x && y == _other.y);
 	}
 
 	template<typename VT> requires std::is_arithmetic<VT>::value
-		Vector2d<T> operator*(const VT& _value)
+	Vector2d<T> operator*(const VT& _value) const
 	{
 		return Vector2d<T>((T)(x * _value), (T)(y * _value));
 	}
 
 	template<typename VT> requires std::is_arithmetic<VT>::value
-		Vector2d<T> operator/(const VT& _value)
+	Vector2d<T> operator/(const VT& _value) const
 	{
 		return Vector2d<T>((T)(x / _value), (T)(y / _value));
 	}
 
-	Vector2d<T> operator+(const Vector2d<T>& _other)
+	Vector2d<T> operator+(const Vector2d<T>& _other) const
 	{
 		return Vector2d<T>(x + _other.x, y + _other.y);
 	}
 
-	Vector2d<T> operator-(const Vector2d<T>& _other)
+	Vector2d<T> operator-(const Vector2d<T>& _other) const
 	{
 		return Vector2d<T>(x - _other.x, y - _other.y);
 	}
 
-	inline bool IsZero() { return ((x + y) == 0); }
+	inline bool IsZero() const { return ((x + y) == 0); }
 };
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -69,38 +69,15 @@ template<typename T> requires std::is_arithmetic<T>::value
 struct Vector
 {
 	using ValueType_t = T;
-	T x = 0;
-	T y = 0;
-	T z = 0;
-
-	Vector() = default;
-	Vector(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {}
-	Vector(const Vector& _other) : x(_other.x), y(_other.y), z(_other.z) {}
-	Vector(Vector&& _other) : x(_other.x), y(_other.y), z(_other.z) { _other.x = 0; _other.y = 0; _other.z = 0; }
+	T x{};
+	T y{};
+	T z{};
 
 	void Reset()
 	{
-		x = 0;
-		y = 0;
-		z = 0;
-	}
-
-	Vector<T>& operator=(const Vector<T>& _other)
-	{
-		x = _other.x;
-		y = _other.y;
-		z = _other.z;
-		return *this;
-	}
-	Vector<T>& operator=(Vector<T>&& _other)
-	{
-		x = _other.x;
-		y = _other.y;
-		z = _other.z;
-		_other.x = 0;
-		_other.y = 0;
-		_other.z = 0;
-		return *this;
+		x = {};
+		y = {};
+		z = {};
 	}
 
 	bool operator!=(const Vector<T>_other)
@@ -124,6 +101,12 @@ struct Vector
 		return Vector<T>((T)(x / _value), (T)(y / _value), (T)(z / _value));
 	}
 
+	template<typename VT> requires std::is_arithmetic<VT>::value
+		Vector<T> operator+(const VT& _value) const
+	{
+		return Vector<T>((T)(x + _value), (T)(y + _value), (T)(z + _value));
+	}
+
 	Vector<T> operator+(const Vector<T>& _other) const
 	{
 		return Vector<T>(x + _other.x, y + _other.y, z + _other.z);
@@ -136,7 +119,7 @@ struct Vector
 
 	float Magnitude() const
 	{
-		return (float)sqrtl((x * x) + (y * y) + (z * z));
+		return (float)sqrt((x * x) + (y * y) + (z * z));
 	}
 
 	double SqrtMagnitude() const

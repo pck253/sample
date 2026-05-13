@@ -1,8 +1,7 @@
 ﻿#pragma once
 
-class StringUtility
+namespace StringUtility
 {
-public:
 	static bool Utf8ToUnicode(const std::string& _src, std::wstring& _dest)
 	{
 		wchar_t wChar;
@@ -86,5 +85,20 @@ public:
 			}
 		}
 		return length;
+	}
+
+	static std::vector<std::string> Split(const std::string& _string, const std::string& _delimiter)
+	{
+		std::string_view stringView = _string;
+		std::string_view delimiterView = _delimiter;
+
+		std::vector<std::string> tokens;
+		tokens.reserve(10);
+		for (auto const& token : std::ranges::split_view(stringView, delimiterView))
+		{
+			std::string temp(token.data(), token.size());
+			tokens.emplace_back(std::move(temp));
+		}
+		return std::move(tokens);
 	}
 };

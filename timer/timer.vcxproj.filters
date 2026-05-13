@@ -4,6 +4,9 @@
     <Filter Include="public">
       <UniqueIdentifier>{8d2b2320-0fd9-4dce-bc6d-99e9f219359d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="impl">
+      <UniqueIdentifier>{58bda56b-ad97-496c-b1e6-1976190c5e6d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -12,11 +15,17 @@
       <Filter>public</Filter>
     </ClInclude>
     <ClInclude Include="timer_accessor_impl.h" />
+    <ClInclude Include="impl\timer_job_manager_impl.h">
+      <Filter>impl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="timer.cpp" />
     <ClCompile Include="timer_accessor_impl.cpp" />
+    <ClCompile Include="impl\timer_job_manager_impl.cpp">
+      <Filter>impl</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

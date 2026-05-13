@@ -14,9 +14,11 @@
     <ProjectCapability Include="SourceItemsFromImports" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\instance_pool.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\memory_pool.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\stl_allocator.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\application.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\cheat\cheat_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\error.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\logger.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\math\math_common.h" />
@@ -25,9 +27,11 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)all\thread\serialized_job_queue.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\thread\thread_pool.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\etc_utility.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\job_utility.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\shutdown_utility.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\stl_utility.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\string_utility.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\time_utility.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)module\module_static_impl.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)module_impl\module_static_impl.h" />
   </ItemGroup>
 </Project>

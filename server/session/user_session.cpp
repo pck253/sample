@@ -1,8 +1,6 @@
 #include "pch.h"
 
-UserSession::PacketHandlerCallers_t UserSession::m_packetHandlerCallers;
-
-UserSession::UserSession(ConnectionShared_t _conn, ThreadPool& _threadPool)
+UserSession::UserSession(ThreadPool& _threadPool, ConnectionShared_t _conn)
 	: Super_t(_threadPool), m_connection(_conn)
 {
 }
@@ -13,7 +11,7 @@ UserSession::~UserSession()
 	Log("deleted UserSession");
 }
 
-Result UserSession::Send(const PacketSize_t& _size, const uint8_t* _serializedData, PacketDeallocatorShared_t& _deallocator)
+Result UserSession::Send(const PacketSize_t& _size, const uint8_t* _serializedData, const PacketDeallocatorShared_t& _deallocator)
 {
 	return m_connection->Send(_size, _serializedData, _deallocator);
 }
@@ -25,13 +23,13 @@ void UserSession::Close(const Result& _reason)
 
 void UserSession::Closed(const Result& _result)
 {
-	Shutdown();
+	Shutdown(EShutdownMode::RightNow, "user session shutdown.");
 }
 
 void UserSession::InitPacketHandlers()
 {
-	m_packetHandlerCallers.emplace(Client::Protocol::Protocol_TestMessage,
-		new FbPacketHandleCaller<UserSessionShared_t, Client::Body, Client::TestMessage>([](UserSessionShared_t&) { return true; }));
+	m_packetHandlerCallers.emplace(Client::EProtocol::TestMessage,
+		new ZppBitsPacketHandleCaller<UserSessionShared_t, Client::TestMessage>([](UserSessionShared_t&) { return true; }));
 }
 
 void UserSession::UninitPacketHandlers()
@@ -43,17 +41,18 @@ void UserSession::UninitPacketHandlers()
 	m_packetHandlerCallers.clear();
 }
 
-bool UserSession::CallPacketHandler(our::vector<uint8_t>&& _rawData)
+bool UserSession::CallPacketHandler(std::vector<uint8_t>&& _rawData)
 {
-	const Client::Body* _packetBody = Client::GetBody(&_rawData[0]);
+	ClientPacketBase base;
+	zpp::bits::in in(_rawData);
+	auto result = in(base);
 
-	Client::Protocol protocol = _packetBody->body_type();
-	auto found = m_packetHandlerCallers.find(protocol);
+	const auto found = m_packetHandlerCallers.find(static_cast<Client::EProtocol>(base.rawProtocol));
 	if (m_packetHandlerCallers.end() == found)
 	{
 		return false;
 	}
 
 	auto self = Get<UserSession>();
-	return found->second->CallHandler(self, _packetBody, std::move(_rawData));
+	return found->second->CallHandler(self, in);
 }

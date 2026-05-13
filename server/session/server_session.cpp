@@ -1,10 +1,7 @@
 #include "pch.h"
 
-ServerSession::ServerPacketHandlerCallers_t ServerSession::m_serverPacketHandlerCallers;
-ServerSession::Super_t::CommonPacketHandlerCallers_t ServerSession::Super_t::m_commonPacketHandlerCallers;
-
-ServerSession::ServerSession(ConnectionShared_t _conn, ThreadPool& _threadPool)
-	: Super_t(_conn, _threadPool)
+ServerSession::ServerSession(ThreadPool& _threadPool, ConnectionShared_t _conn)
+	: Super_t(_threadPool, _conn)
 {
 }
 
@@ -15,7 +12,7 @@ ServerSession::~ServerSession()
 
 void ServerSession::InitPacketHandlers()
 {
-	m_serverPacketHandlerCallers.emplace(ServerTest::Protocol::Protocol_Test, new FbPacketHandleCaller<Shared_t, ServerTest::Body, ServerTest::Test>([](ServerSessionShared_t&) { return true; }));
+	m_serverPacketHandlerCallers.emplace(ServerTest::EProtocol::Test, new ZppBitsPacketHandleCaller<Shared_t, ServerTest::Test>([](ServerSessionShared_t&) { return true; }));
 
 	Super_t::InitCommonPacketHandlers();
 }
@@ -31,34 +28,32 @@ void ServerSession::UninitPacketHandlers()
 	Super_t::UninitCommonPacketHandlers();
 }
 
-bool ServerSession::CallPacketHandler(our::vector<uint8_t>&& _rawData)
+bool ServerSession::CallPacketHandler(std::vector<uint8_t>&& _rawData)
 {
-	const ServerPacketBody* packetBody = GetServerPacketBody(&_rawData[0]);
+	ServerPacketBase base;
+	zpp::bits::in in(_rawData);
+	auto result = in(base);
 
-	auto self = Get<ServerSession>();
-
-	ServerPacket packet = packetBody->body_type();
-	switch (packet)
+	switch (base.type)
 	{
-	case ServerPacket_ServerCommon_Body:
+	case EServerPacketType::ServerCommon:
 		{
-			auto body = packetBody->body_as_ServerCommon_Body();
-			return Super_t::CallCommonPacketHandler(body, std::move(_rawData));
+			const auto protocol{ static_cast<ServerCommon::EProtocol>(base.rawProtocol) };
+			return Super_t::CallCommonPacketHandler(protocol, in);
 		}
 		break;
-	case ServerPacket_ServerTest_Body:
+	case EServerPacketType::ServerTest:
 		{
-			auto body = packetBody->body_as_ServerTest_Body();
-			auto protocol = body->body_type();
-			auto found = m_serverPacketHandlerCallers.find(protocol);
-			if (m_serverPacketHandlerCallers.end() == found)
+			const auto protocol{ static_cast<ServerTest::EProtocol>(base.rawProtocol) };
+			const auto found = m_serverPacketHandlerCallers.find(protocol);
+			if (m_serverPacketHandlerCallers.end() != found)
 			{
-				return false;
+				auto self = Get<ServerSession>();
+				return found->second->CallHandler(self, in);
 			}
-
-			auto self = Get<ServerSession>();
-			return found->second->CallHandler(self, body, std::move(_rawData));
 		}
+		break;
 	}
+
 	return false;
 }

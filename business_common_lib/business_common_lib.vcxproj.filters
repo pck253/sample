@@ -8,8 +8,11 @@
     <Filter Include="protocol">
       <UniqueIdentifier>{132c7e40-8c4a-44eb-8d4b-cf1f5c9eebeb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="protocol\by_flatbuffer">
-      <UniqueIdentifier>{d68bb8bb-34d8-4da8-8dc2-f5b2f78a4088}</UniqueIdentifier>
+    <Filter Include="protocol\by_zpp_bits">
+      <UniqueIdentifier>{5fe2abff-4d52-4a57-bd29-dcae14ec4bbf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="protocol\by_zpp_bits\definitions">
+      <UniqueIdentifier>{574651c8-b44c-44fa-8c5f-de6c9c8c8830}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -17,33 +20,32 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="protocol\flat_buffer_packet_handler.h">
-      <Filter>protocol</Filter>
-    </ClInclude>
-    <ClInclude Include="protocol\by_flatbuffer\server_common_generated.h">
-      <Filter>protocol\by_flatbuffer</Filter>
-    </ClInclude>
-    <ClInclude Include="protocol\by_flatbuffer\server_generated.h">
-      <Filter>protocol\by_flatbuffer</Filter>
-    </ClInclude>
-    <ClInclude Include="protocol\by_flatbuffer\client_generated.h">
-      <Filter>protocol\by_flatbuffer</Filter>
-    </ClInclude>
     <ClInclude Include="business_common.h" />
     <ClInclude Include="server_session_base.h" />
+    <ClInclude Include="protocol\zpp_bits_packet_handler.h">
+      <Filter>protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="business_common_alias.h" />
+    <ClInclude Include="business_common_definition.h" />
+    <ClInclude Include="protocol\by_zpp_bits\client.h">
+      <Filter>protocol\by_zpp_bits</Filter>
+    </ClInclude>
+    <ClInclude Include="protocol\by_zpp_bits\server_common.h">
+      <Filter>protocol\by_zpp_bits</Filter>
+    </ClInclude>
+    <ClInclude Include="protocol\by_zpp_bits\base.h">
+      <Filter>protocol\by_zpp_bits</Filter>
+    </ClInclude>
+    <ClInclude Include="protocol\by_zpp_bits\server_test.h">
+      <Filter>protocol\by_zpp_bits</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="protocol\by_flatbuffer\server.fbs">
-      <Filter>protocol\by_flatbuffer</Filter>
+    <None Include="protocol\by_zpp_bits\definitions\client.json">
+      <Filter>protocol\by_zpp_bits\definitions</Filter>
     </None>
-    <None Include="protocol\by_flatbuffer\server_common.fbs">
-      <Filter>protocol\by_flatbuffer</Filter>
-    </None>
-    <None Include="protocol\by_flatbuffer\server_test.fbs">
-      <Filter>protocol\by_flatbuffer</Filter>
-    </None>
-    <None Include="protocol\by_flatbuffer\client.fbs">
-      <Filter>protocol\by_flatbuffer</Filter>
+    <None Include="protocol\by_zpp_bits\definitions\server_common.json">
+      <Filter>protocol\by_zpp_bits\definitions</Filter>
     </None>
   </ItemGroup>
 </Project>

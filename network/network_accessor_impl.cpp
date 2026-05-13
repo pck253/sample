@@ -1,19 +1,28 @@
 #include "pch.h"
 
+static_assert(NETWORK_MODULE == 1);
 
-Result NetworkAccessorImpl::RegistAcceptedHandler(const std::string& _listenerName, AcceptedHandler_t&& _handler)
+Result NetworkAccessorImpl::RegistAcceptedConfig(const std::string& _listenerName, const AcceptedConfig& _acceptedConfig)
 {
-	return m_networkModule.GetListener().SetAcceptedHandler(_listenerName, std::move(_handler));
+	if (m_networkModule.IsRedirectToImn(_listenerName))
+	{
+		return m_networkModule.GetImnManager().SetAcceptedConfig(_listenerName, _acceptedConfig);
+	}
+	return m_networkModule.GetListener().SetAcceptedConfig(_listenerName, _acceptedConfig);
 }
 
-Result NetworkAccessorImpl::RequestConnect(const std::string& _address, const uint16_t& _port, ConnectedHandler_t&& _handler)
+Result NetworkAccessorImpl::RequestConnect(const std::string& _address, const uint16_t& _port, const ConnectedConfig& _connectedConfig)
 {
-	return m_networkModule.GetConnecter().RequestConnect(_address, _port, std::move(_handler));
+	return m_networkModule.GetConnecter().RequestConnect(_address, _port, _connectedConfig);
 }
 
-Result NetworkAccessorImpl::RequestConnect(const std::string& _connecterName, ConnectedHandler_t&& _handler, const uint16_t& _tryReconnectCount)
+Result NetworkAccessorImpl::RequestConnect(const std::string& _connecterName, const ConnectedConfig& _connectedConfig, const uint16_t& _tryReconnectCount)
 {
-	return m_networkModule.GetConnecter().RequestConnect(_connecterName, std::move(_handler), _tryReconnectCount);
+	if (m_networkModule.IsRedirectToImn(_connecterName))
+	{
+		return m_networkModule.GetImnManager().RequestConnect(_connecterName, _connectedConfig);
+	}
+	return m_networkModule.GetConnecter().RequestConnect(_connecterName, _connectedConfig, _tryReconnectCount);
 }
 
 void NetworkAccessorImpl::StopPublicListen(const std::string& _listenerName)

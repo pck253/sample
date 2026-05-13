@@ -1,30 +1,26 @@
 #pragma once
 
 class UserSession : public SerializedJobQueue
-{   
+{
+    friend SerializedJobQueue;
     using Super_t = SerializedJobQueue;
 public:
-    using PacketHandlerCallers_t = std::unordered_map<Client::Protocol, FbPacketHandleCallerBase<UserSessionShared_t, Client::Body>*>;
-
-    static UserSessionShared_t Create(ConnectionShared_t _conn, ThreadPool& _threadPool)
-    {
-        return UserSessionShared_t(new UserSession(_conn, _threadPool));
-    }
+    using PacketHandlerCallers_t = std::unordered_map<Client::EProtocol, ZppBitsPacketHandleCallerBase<UserSessionShared_t>*>;
 
     ~UserSession();
 
-    Result Send(const PacketSize_t& _size, const uint8_t* _serializedData, PacketDeallocatorShared_t& _deallocator);
+    Result Send(const PacketSize_t& _size, const uint8_t* _serializedData, const PacketDeallocatorShared_t& _deallocator);
     void Close(const Result& _reason);
     void Closed(const Result& _result);
 
     static void InitPacketHandlers();
     static void UninitPacketHandlers();
-    bool CallPacketHandler(our::vector<uint8_t>&& _rawData);
+    bool CallPacketHandler(std::vector<uint8_t>&& _rawData);
 
 private:
-    UserSession(ConnectionShared_t _conn, ThreadPool& _threadPool);
+    UserSession(ThreadPool& _threadPool, ConnectionShared_t _conn);
 
     ConnectionShared_t m_connection;
 
-    static PacketHandlerCallers_t m_packetHandlerCallers;
+    static inline PacketHandlerCallers_t m_packetHandlerCallers;
 };
