@@ -47,6 +47,7 @@
 - HTTP 요청 핸들링
 - JSON 기반 요청/응답 처리
 - `WebAccessor`: 웹 기능 인터페이스
+- **기본 API**: `/shutdown` - 서버 정상 종료 (GET 요청)
 
 #### 5. **timer** (타이머 모듈)
 - 스케줄된 작업 관리
@@ -203,14 +204,6 @@ second_server.exe config/second_server.config
 - `sample_server_debug_1.lnk`: 첫 번째 서버 디버그 실행
 - `sample_server_debug_2.lnk`: 두 번째 서버 디버그 실행
 - `sample_test_client_debug.lnk`: 테스트 클라이언트 디버그 실행
-
-## 핵심 디자인 패턴
-
-1. **Module Pattern**: 각 기능을 독립적인 모듈로 분리
-2. **Factory Pattern**: 설정에 따른 동적 모듈 생성
-3. **Object Pool Pattern**: 메모리 최적화 및 성능 향상
-4. **Thread Pool Pattern**: 멀티스레드 작업 관리
-5. **Observer Pattern**: 이벤트 기반 세션 관리
 
 ---
 
