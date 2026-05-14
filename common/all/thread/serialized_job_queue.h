@@ -99,7 +99,7 @@ public:
         {
             return this->shared_from_this();
         }
-        return std::static_pointer_cast<T>(this->shared_from_this());
+        return std::dynamic_pointer_cast<T>(this->shared_from_this());
     }
 
     void SetOnEmptyJob(std::function<void()>&& _onEmptyJob) { m_onEmptyJob = std::move(_onEmptyJob); }
