@@ -5,7 +5,7 @@ class Session : public SerializedJobQueue
     friend SerializedJobQueue;
     using Super_t = SerializedJobQueue;
 public:
-    using PacketHandlerCallers_t = std::unordered_map<Client::EProtocol, ZppBitsPacketHandleCallerBase<SessionShared_t>*>;
+    using PacketHandlerCallers_t = std::unordered_map<Client::EProtocol, ZppBitsPacketHandleCallerBase<Session>*>;
 
     ~Session();
 

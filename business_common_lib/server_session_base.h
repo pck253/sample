@@ -60,7 +60,7 @@ class ServerSessionBase : public SerializedJobQueue
 	friend SerializedJobQueue;
 	using Super_t = SerializedJobQueue;
 public:
-	using CommonPacketHandlerCallers_t = std::unordered_map<ServerCommon::EProtocol, ZppBitsPacketHandleCallerBase<std::shared_ptr<T>>*>;
+	using CommonPacketHandlerCallers_t = std::unordered_map<ServerCommon::EProtocol, ZppBitsPacketHandleCallerBase<T>*>;
 
 	virtual ~ServerSessionBase()
 	{
@@ -99,8 +99,8 @@ protected:
 
 	static void InitCommonPacketHandlers()
 	{
-		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Activation, new ZppBitsPacketHandleCaller<std::shared_ptr<T>, ServerCommon::Activation>([](std::shared_ptr<T>&) { return true; }));
-		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Shutdown, new ZppBitsPacketHandleCaller<std::shared_ptr<T>, ServerCommon::Shutdown>([](std::shared_ptr<T>&) { return true; }));
+		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Activation, new ZppBitsPacketHandleCaller<T, ServerCommon::Activation>([](const T&) { return true; }));
+		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Shutdown, new ZppBitsPacketHandleCaller<T, ServerCommon::Shutdown>([](const T&) { return true; }));
 	}
 
 	static void UninitCommonPacketHandlers()
@@ -120,8 +120,7 @@ protected:
 			return false;
 		}
 
-		auto self = Get<T>();
-		return found->second->CallHandler(self, _in);
+		return found->second->CallHandler(As<T>(), _in);
 	}
 
 	ServerSerial m_serial;
@@ -304,11 +303,12 @@ public:
 		return true;
 	}
 
-	void Travel(std::function<void(SessoinShared_t&)>&& _travelFunc)
+	void Travel(std::function<void(T&)>&& _travelFunc)
 	{
+		SCOPED_READ_LOCK(m_mutex);
 		for (auto& [connectionId, session] : m_sessions)
 		{
-			_travelFunc(session);
+			_travelFunc(*session.get());
 		}
 	}
 

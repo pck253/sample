@@ -90,7 +90,7 @@ struct NetworkHelper
 			auto useListeners = useListenersConfig.get<std::vector<nlohmann::json>>();
 			for (auto& listenerName : useListeners)
 			{
-				auto ret = networkAccessor->Get<NetworkAccessor>().RegistAcceptedConfig(listenerName.get<std::string>(), _acceptedConfig);
+				auto ret = networkAccessor->As<NetworkAccessor>().RegistAcceptedConfig(listenerName.get<std::string>(), _acceptedConfig);
 				if (ret != EError::Success)
 				{
 					return ret;
@@ -112,7 +112,7 @@ struct NetworkHelper
 				auto name = useConnecter["name"].get<std::string>();
 				auto reconnectCount = useConnecter["initial reconnect count"].get<uint16_t>();
 
-				auto ret = networkAccessor->Get<NetworkAccessor>().RequestConnect(name, _connectedConfig, reconnectCount);
+				auto ret = networkAccessor->As<NetworkAccessor>().RequestConnect(name, _connectedConfig, reconnectCount);
 				if (ret != EError::Success)
 				{
 					return ret;

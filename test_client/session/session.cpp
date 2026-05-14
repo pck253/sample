@@ -30,7 +30,7 @@ void Session::Closed(const Result& _result)
 void Session::InitPacketHandlers()
 {
 	m_packetHandlerCallers.emplace(Client::EProtocol::TestMessage,
-		new ZppBitsPacketHandleCaller<SessionShared_t, Client::TestMessage>([](SessionShared_t&) { return true; }));
+		new ZppBitsPacketHandleCaller<Session, Client::TestMessage>([](const Session&) { return true; }));
 }
 
 void Session::UninitPacketHandlers()
@@ -54,8 +54,7 @@ bool Session::CallPacketHandler(std::vector<uint8_t>&& _rawData)
 		return false;
 	}
 
-	auto self = Get<Session>();
-	return found->second->CallHandler(self, in);
+	return found->second->CallHandler(As<Session>(), in);
 }
 
 void Session::ReceivedStatics(const PacketSize_t& _receivedSize)

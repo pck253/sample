@@ -13,7 +13,7 @@ template<typename ST, typename PB>
 class ZppBitsPacketHandleCaller : public ZppBitsPacketHandleCallerBase<ST>
 {
 public:
-	ZppBitsPacketHandleCaller(std::function<bool(ST&)>&& _checker)
+	ZppBitsPacketHandleCaller(std::function<bool(const ST&)>&& _checker)
 		: m_checker(std::move(_checker))
 	{}
 	virtual ~ZppBitsPacketHandleCaller() { m_checker = nullptr; }
@@ -32,7 +32,7 @@ public:
 	}
 
 private:
-	std::function<bool(ST&)> m_checker;
+	std::function<bool(const ST&)> m_checker;
 };
 
 namespace ZppBits

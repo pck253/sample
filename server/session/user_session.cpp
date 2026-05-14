@@ -29,7 +29,7 @@ void UserSession::Closed(const Result& _result)
 void UserSession::InitPacketHandlers()
 {
 	m_packetHandlerCallers.emplace(Client::EProtocol::TestMessage,
-		new ZppBitsPacketHandleCaller<UserSessionShared_t, Client::TestMessage>([](UserSessionShared_t&) { return true; }));
+		new ZppBitsPacketHandleCaller<UserSession, Client::TestMessage>([](const UserSession&) { return true; }));
 }
 
 void UserSession::UninitPacketHandlers()
@@ -53,6 +53,5 @@ bool UserSession::CallPacketHandler(std::vector<uint8_t>&& _rawData)
 		return false;
 	}
 
-	auto self = Get<UserSession>();
-	return found->second->CallHandler(self, in);
+	return found->second->CallHandler(*this, in);
 }

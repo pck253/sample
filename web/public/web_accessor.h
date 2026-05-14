@@ -101,7 +101,7 @@ struct WebHelper
 				auto useListeners = useListenersConfig.get<std::vector<nlohmann::json>>();
 				for (auto& listenerName : useListeners)
 				{
-					auto ret = _webAccessor->Get<WebAccessor>().SetRestfulHandler(listenerName, _requestHandler);
+					auto ret = _webAccessor->As<WebAccessor>().SetRestfulHandler(listenerName, _requestHandler);
 					if (ret != EError::Success)
 					{
 						return ret;

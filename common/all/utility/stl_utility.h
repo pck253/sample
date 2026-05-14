@@ -68,3 +68,26 @@ struct FunctionTraits
 {
 };
 // FunctionTraits
+
+// ExtractSharedPtrInner
+template<typename T>
+struct ExtractSharedPtrInner;
+
+template<typename T>
+struct ExtractSharedPtrInner<std::shared_ptr<T>>
+{
+    using Type = T;
+};
+
+template<typename T>
+struct ExtractSharedPtrInner<const std::shared_ptr<T>&>
+{
+    using Type = T;
+};
+
+template<typename T>
+struct ExtractSharedPtrInner<std::shared_ptr<T>&&>
+{
+    using Type = T;
+};
+// ExtractSharedPtrInner

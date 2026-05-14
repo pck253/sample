@@ -1,3 +1,3 @@
 #pragma once
 
-bool Handler(SessionShared_t& _session, Client::TestMessage&& _packet);
+bool Handler(Session& _session, Client::TestMessage&& _packet);

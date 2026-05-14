@@ -21,11 +21,11 @@ static bool OnAcceptedConnection(const Result& _result, ConnectionShared_t _conn
 
 	if (!_conn->IsPublic())
 	{
-		Module::Get<Server>()->ServerConnected(_conn);
+		Module::As<Server>()->ServerConnected(_conn);
 	}
 	else
 	{
-		Module::Get<Server>()->AddUserSession(_conn);
+		Module::As<Server>()->AddUserSession(_conn);
 	}
 
 	return true;
@@ -39,7 +39,7 @@ static bool OnConnected(const Result& _result, const std::string& _connecterName
 		return false;
 	}
 
-	Module::Get<Server>()->ServerConnected(_conn);
+	Module::As<Server>()->ServerConnected(_conn);
 
 	return true;
 }
@@ -48,30 +48,30 @@ static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t
 {
 	if (_conn->IsPublic())
 	{
-		auto const user = Module::Get<Server>()->FindUserSession(_conn->GetConnectionId());
+		auto const user = Module::As<Server>()->FindUserSession(_conn->GetConnectionId());
 		if (not user)
 		{
 			LogError("not exist user");
 			return;
 		}
 
-		user->PushJob([_rawData = std::move(_rawData)](const UserSessionShared_t& _user) mutable
+		user->PushJob([_rawData = std::move(_rawData)](UserSession& _user) mutable
 			{
-				_user->Get<UserSession>()->CallPacketHandler(std::move(_rawData));
+				_user.CallPacketHandler(std::move(_rawData));
 			});
 	}
 	else
 	{
-		auto const server = Module::Get<Server>()->GetServerSessionManager().FindSession(_conn->GetConnectionId());
+		auto const server = Module::As<Server>()->GetServerSessionManager().FindSession(_conn->GetConnectionId());
 		if (not server)
 		{
 			LogError("not exist server");
 			return;
 		}
 
-		server->PushJob([_rawData = std::move(_rawData)](const ServerSessionShared_t& _server) mutable
+		server->PushJob([_rawData = std::move(_rawData)](ServerSession& _server) mutable
 			{
-				_server->CallPacketHandler(std::move(_rawData));
+				_server.CallPacketHandler(std::move(_rawData));
 			});
 	}
 }
@@ -84,7 +84,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 		{
 			LogWarning("Closed User Session : {}", _result.message);
 		}
-		Module::Get<Server>()->ClosedUserSession(_result, _connectionId);
+		Module::As<Server>()->ClosedUserSession(_result, _connectionId);
 	}
 	else
 	{
@@ -93,7 +93,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 			LogWarning("Closed Server Session : {}", _result.message);
 		}
 
-		auto session = Module::Get<Server>()->GetServerSessionManager().RemoveSession(_connectionId);
+		auto session = Module::As<Server>()->GetServerSessionManager().RemoveSession(_connectionId);
 		if (session)
 		{
 			session->Closed();
@@ -103,7 +103,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 
 static bool OnRestfulRequest(const RestufulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, WebAccessor* _accessor)
 {
-	Module::Get<Server>()->CallRestfulHandler(_requestId, _path, _query, _accessor);
+	Module::As<Server>()->CallRestfulHandler(_requestId, _path, _query, _accessor);
 	return true;
 }
 
@@ -177,6 +177,12 @@ void Server::InitRestfulHandlers()
 {
 	m_restfulHandlers.emplace(L"/shutdown", [this](const WebParams&)
 		{
+			m_serverSessionManager.Travel([](ServerSession& _otherServer)
+				{
+					auto serializedInfo{ ZppBits::Serialize(ServerCommon::Shutdown()) };
+					_otherServer.Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
+				});
+
 			GetApplication()->Shutdown();
 			return nlohmann::json({ {"message", "done"} });
 		});
@@ -252,16 +258,16 @@ void Server::ClosedUserSession(const Result& _result, const ConnectionId_t& _con
 
 	if (user)
 	{
-		user->PushJob([_result](const UserSessionShared_t& _user)
+		user->PushJob([_result](UserSession& _user)
 			{
-				_user->Closed(_result);
+				_user.Closed(_result);
 			});
 	}
 }
 
 ServerSessionShared_t Server::ServerConnected(ConnectionShared_t _conn)
 {
-	auto server = Module::Get<Server>()->GetServerSessionManager().CreateSession(_conn);
+	auto server = Module::As<Server>()->GetServerSessionManager().CreateSession(_conn);
 
 	server->SendActivation(GetModuleType(), GetServerId(), GetServerGroupId());
 

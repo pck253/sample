@@ -6,7 +6,7 @@ class ServerSession : public ServerSessionBase<ServerSession>
 public:
     using Super_t = ServerSessionBase<ServerSession>;
     using Shared_t = std::shared_ptr<ServerSession>;
-    using ServerPacketHandlerCallers_t = std::unordered_map<ServerTest::EProtocol, ZppBitsPacketHandleCallerBase<ServerSessionShared_t>*>;
+    using ServerPacketHandlerCallers_t = std::unordered_map<ServerTest::EProtocol, ZppBitsPacketHandleCallerBase<ServerSession>*>;
 
     ~ServerSession();
 

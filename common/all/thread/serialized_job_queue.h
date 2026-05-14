@@ -2,27 +2,6 @@
 
 class SerializedJobQueue : public std::enable_shared_from_this<SerializedJobQueue>, public UseShutdown
 {
-    template<typename T>
-    struct ExtractSharedPtrInner;
-
-    template<typename T>
-    struct ExtractSharedPtrInner<std::shared_ptr<T>>
-    {
-        using Type = T;
-    };
-
-    template<typename T>
-    struct ExtractSharedPtrInner<const std::shared_ptr<T>&>
-    {
-        using Type = T;
-    };
-
-    template<typename T>
-    struct ExtractSharedPtrInner<std::shared_ptr<T>&&>
-    {
-        using Type = T;
-    };
-
 public:
     class IJobWrapper : public MemPoolInstance
     {
@@ -48,20 +27,25 @@ public:
             constexpr size_t count = std::tuple_size_v<ArgTypes_t>;
             if constexpr (1 == count)
             {
-                using Target_t = typename ExtractSharedPtrInner<std::tuple_element_t<0, ArgTypes_t>>::Type;
+                //using Target_t = typename ExtractSharedPtrInner<std::tuple_element_t<0, ArgTypes_t>>::Type;
+                using Target_t = std::tuple_element_t<0, ArgTypes_t>;
 
                 if constexpr (std::is_same_v<Target_t, SerializedJobQueue>)
                 {
-                    m_job(_jobQueue);
+                    m_job(*_jobQueue.get());
+                }
+                else if constexpr (std::derived_from<Target_t, SerializedJobQueue>)
+                {
+                    m_job(_jobQueue->As<Target_t>());
                 }
                 else
                 {
-                    m_job(_jobQueue->Get<Target_t>());
+                    static_assert(false);
                 }
             }
             else
             {
-                assert(false);
+                static_assert(false);
             }
         }
     private:
@@ -100,6 +84,18 @@ public:
             return this->shared_from_this();
         }
         return std::dynamic_pointer_cast<T>(this->shared_from_this());
+    }
+
+    template<class T = SerializedJobQueue> requires std::derived_from<T, SerializedJobQueue>
+    const T& As() const
+    {
+        return dynamic_cast<const T&>(*this);
+    }
+
+    template<class T = SerializedJobQueue> requires std::derived_from<T, SerializedJobQueue>
+    T& As()
+    {
+        return dynamic_cast<T&>(*this);
     }
 
     void SetOnEmptyJob(std::function<void()>&& _onEmptyJob) { m_onEmptyJob = std::move(_onEmptyJob); }

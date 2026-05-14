@@ -19,22 +19,22 @@ static bool OnConnected(const Result& _result, const std::string& _connecterName
 		return false;
 	}
 
-	Module::Get<TestClient>()->Connected(_conn);
+	Module::As<TestClient>()->Connected(_conn);
 
 	return true;
 }
 
 static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t& _conn)
 {
-	auto const session = Module::Get<TestClient>()->GetSession();
+	auto const session = Module::As<TestClient>()->GetSession();
 	if (not session)
 	{
 		LogError("not exist session");
 		return;
 	}
-	session->PushJob([_rawData = std::move(_rawData)](const SessionShared_t& _session) mutable
+	session->PushJob([_rawData = std::move(_rawData)](Session& _session) mutable
 		{
-			_session->CallPacketHandler(std::move(_rawData));
+			_session.CallPacketHandler(std::move(_rawData));
 		});
 }
 
@@ -44,7 +44,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 	{
 		LogWarning("Closed Session : {}", _result.message);
 	}
-	Module::Get<TestClient>()->ApplicationShutdown(_result);
+	Module::As<TestClient>()->ApplicationShutdown(_result);
 }
 
 Result TestClient::InitImpl()
@@ -203,7 +203,7 @@ void TestSendFunc(uint64_t sendIndex, SessionShared_t _session)
 			TestSendFunc(sendIndex, _session);
 		});
 
-	Module::Get<TestClient>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 16);
+	Module::As<TestClient>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 16);
 }
 // ------------------------------------------------------------------------------------------
 

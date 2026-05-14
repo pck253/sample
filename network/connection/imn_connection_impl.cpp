@@ -28,7 +28,7 @@ Result ImnConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _serial
     std::vector<uint8_t> rawData(_size);
     memcpy_s(&rawData[0], _size, _serializedData, _size);
 
-    m_jobQueue->PushJob([self = Get(), sendRawData = std::move(rawData)](const SerializedJobQueueShared_t& _jobQueue) mutable
+    m_jobQueue->PushJob([self = Get(), sendRawData = std::move(rawData)](SerializedJobQueue& _jobQueue) mutable
         {
             auto size = sendRawData.size();
             ImnConnectionImpl* conn = static_cast<ImnConnectionImpl*>(self.get());
@@ -63,13 +63,13 @@ Result ImnConnectionImpl::Close(const Result& _reason)
         return EError::ClosedSocket;
     }
 
-    m_receivedJobQueue->PushJob([_reason, this](const SerializedJobQueueShared_t& _jobQueue)
+    m_receivedJobQueue->PushJob([_reason, this](SerializedJobQueue& _jobQueue)
         {
             m_receivedHandler = nullptr;
         });
     m_receivedJobQueue->Shutdown(EShutdownMode::CurrentJob, "imn received job queue shutdown.");
 
-    m_jobQueue->PushJob([_reason, this](const SerializedJobQueueShared_t& _jobQueue)
+    m_jobQueue->PushJob([_reason, this](SerializedJobQueue& _jobQueue)
         {
             if (m_targetConnection)
             {
@@ -103,7 +103,7 @@ Result ImnConnectionImpl::Receive(std::vector<uint8_t>&& _rawData)
         return EError::ClosedSocket;
     }
 
-    m_receivedJobQueue->PushJob([self = Get(), receivedRawData = std::move(_rawData)](const SerializedJobQueueShared_t& _jobQueue) mutable
+    m_receivedJobQueue->PushJob([self = Get(), receivedRawData = std::move(_rawData)](SerializedJobQueue& _jobQueue) mutable
         {
             ImnConnectionImpl* conn = static_cast<ImnConnectionImpl*>(self.get());
             conn->OnReceived(std::move(receivedRawData));

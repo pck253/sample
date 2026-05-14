@@ -12,7 +12,7 @@ ServerSession::~ServerSession()
 
 void ServerSession::InitPacketHandlers()
 {
-	m_serverPacketHandlerCallers.emplace(ServerTest::EProtocol::Test, new ZppBitsPacketHandleCaller<Shared_t, ServerTest::Test>([](ServerSessionShared_t&) { return true; }));
+	m_serverPacketHandlerCallers.emplace(ServerTest::EProtocol::Test, new ZppBitsPacketHandleCaller<ServerSession, ServerTest::Test>([](const ServerSession&) { return true; }));
 
 	Super_t::InitCommonPacketHandlers();
 }
@@ -48,8 +48,7 @@ bool ServerSession::CallPacketHandler(std::vector<uint8_t>&& _rawData)
 			const auto found = m_serverPacketHandlerCallers.find(protocol);
 			if (m_serverPacketHandlerCallers.end() != found)
 			{
-				auto self = Get<ServerSession>();
-				return found->second->CallHandler(self, in);
+				return found->second->CallHandler(*this, in);
 			}
 		}
 		break;

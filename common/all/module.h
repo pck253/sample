@@ -27,9 +27,9 @@ public:
 	virtual ~ModuleAccessor() {};
 
 	template<class T> requires std::derived_from<T, ModuleAccessor>
-	T& Get()
+	T& As()
 	{
-		return static_cast<T&>(*this);
+		return dynamic_cast<T&>(*this);
 	}
 
 protected:
@@ -88,9 +88,9 @@ public:
 	virtual EModule GetModuleType() = 0;
 
 	template<class T = Module> requires std::derived_from<T, Module>
-	static T* Get()
+	static T* As()
 	{
-		return static_cast<T*>(m_self);
+		return dynamic_cast<T*>(m_self);
 	}
 
 	virtual Result Init()

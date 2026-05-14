@@ -1,7 +1,7 @@
 #include "pch.h"
 
 // --------------- client to server ----------------------------
-bool Handler(UserSessionShared_t& _user, Client::TestMessage&& _packet)
+bool Handler(UserSession& _user, Client::TestMessage&& _packet)
 {
 	std::string& title = _packet.title;
 	std::string& body = _packet.body;
@@ -10,9 +10,9 @@ bool Handler(UserSessionShared_t& _user, Client::TestMessage&& _packet)
 
 	auto serializedInfo{ ZppBits::Serialize(res) };
 
-	_user->PushJob([serializedInfo](const UserSessionShared_t& _user) mutable
+	_user.PushJob([serializedInfo](UserSession& _user) mutable
 		{
-			_user->Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
+			_user.Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
 		}
 	);
 
@@ -20,31 +20,32 @@ bool Handler(UserSessionShared_t& _user, Client::TestMessage&& _packet)
 }
 
 // --------------- server common ----------------------------
-bool Handler(ServerSessionShared_t& _server, ServerCommon::Activation&& _packet)
+bool Handler(ServerSession& _server, ServerCommon::Activation&& _packet)
 {
 	ServerSerial serial(_packet.serverId, _packet.moduleType, _packet.serverGroupId);
 
-	if (!Module::Get<Server>()->GetServerSessionManager().AddAuthorizedSession(serial, _server))
+	const auto serverSession = _server.Get<ServerSession>();
+	if (!Module::As<Server>()->GetServerSessionManager().AddAuthorizedSession(serial, serverSession))
 	{
-		auto jobInst = ThreadPool::MakeJobInst([_server]()
+		auto jobInst = ThreadPool::MakeJobInst([serverSession]()
 			{
-				_server->Close(EError::AlreadyExistSameServer);
+				serverSession->Close(EError::AlreadyExistSameServer);
 			});
-		Module::Get<Server>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 1000);
+		Module::As<Server>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 1000);
 	}
 
 	return true;
 }
 
-bool Handler(ServerSessionShared_t& _server, ServerCommon::Shutdown&& _packet)
+bool Handler(ServerSession& _server, ServerCommon::Shutdown&& _packet)
 {
 	Log("received shutdown.");
-	Module::Get<Server>()->ShutdownApplicationByRemote();
+	Module::As<Server>()->ShutdownApplicationByRemote();
 	return true;
 }
 
 // --------------- server to server ----------------------------
-bool Handler(ServerSessionShared_t& _server, ServerTest::Test&& _packet)
+bool Handler(ServerSession& _server, ServerTest::Test&& _packet)
 {
 
 	return true;
