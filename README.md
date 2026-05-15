@@ -10,7 +10,7 @@
 ## 기술 스택
 
 - **언어**: C++ 23
-- **개발 환경**: Visual Studio 2022
+- **개발 환경**: Visual Studio 2026 (v145)
 - **빌드 시스템**: MSBuild (.vcxproj)
 - **패키징/직렬화**: zpp_bits (high-performance binary serialization)
 - **JSON 처리**: nlohmann/json
@@ -20,6 +20,26 @@
 - **스케줄링**: croncpp
 
 ## 프로젝트 구조
+
+### 디렉토리 구성
+```
+sample/
+├── business_common_lib/           # 비즈니스 공통 라이브러리
+├── code_gen/                      # 코드 생성 도구 (C#)
+├── common/                        # 공용 유틸리티 라이브러리
+├── config/                        # 모듈 설정 파일들
+├── network/                       # 네트워크 모듈 (DLL)
+├── resource/                      # 리소스 파일
+├── sdk/                           # 외부 라이브러리 SDK
+├── server/                        # 서버 모듈 (DLL)
+├── test_client/                   # 테스트 클라이언트 (DLL)
+├── timer/                         # 타이머 모듈 (DLL)
+├── web/                           # 웹/REST API 모듈 (DLL)
+├── sample.sln                     # Visual Studio 솔루션
+├── sample.cpp/.h/.vcxproj         # 메인 애플리케이션
+├── README.md                      # 이 문서
+└── 경력기술서.pdf                # 포트폴리오 문서
+```
 
 ### 핵심 모듈
 
@@ -66,6 +86,14 @@
 - 모듈 기본 클래스 (`Module`)
 - 에러 처리 및 타입 정의
 - 수학, 시간, 문자열 유틸리티
+- 치트 커맨드 (`CheatCommand`) - 개발/디버그용 커맨드
+
+#### 8. **sample** (메인 애플리케이션)
+- 설정 파일을 받아 모듈 로드 및 초기화
+- 애플리케이션 라이프사이클 관리 (`Application` 클래스 사용)
+- 공통 초기화 (`InitCommon`) 및 비즈니스 초기화 (`InitBusiness`) 단계 실행
+- 종료 신호까지 대기 (메인 루프)
+- 사용법: `sample.exe <config_file_path>`
 
 ### Code Generation (codegen)
 
@@ -140,9 +168,9 @@ JSON 기반 설정으로 모듈 로드 및 초기화 관리:
 
 ## 빌드 및 실행
 
-### 필수 요구사항
-- Visual Studio 2022 (C++23 지원)
-- Windows 10 이상
+### 개발 환경
+- Visual Studio 2026 (v145)
+- Windows 11 이상
 - x64 플랫폼
 
 ### 빌드
@@ -192,11 +220,26 @@ second_server.exe config/second_server.config
 
 ## 프로젝트 구성 파일
 
+### 메인 솔루션 및 프로젝트
 - **sample.sln**: 메인 Visual Studio 솔루션
-- **sample.vcxproj**: 메인 서버 프로젝트
+- **sample.vcxproj**: 메인 애플리케이션 프로젝트
+- **sample.vcxproj.filters**: 프로젝트 필터 설정
 - **sample.vcxproj.user**: 실행 설정 (디버그 설정 등)
+
+### 모듈 프로젝트
+- **business_common_lib.vcxproj**: 비즈니스 공통 라이브러리
+- **network.vcxproj**: 네트워크 모듈
+- **server.vcxproj**: 서버 모듈
+- **web.vcxproj**: 웹/REST API 모듈
+- **timer.vcxproj**: 타이머 모듈
+- **test_client.vcxproj**: 테스트 클라이언트
+
+### 코드 생성 도구
 - **code_gen.sln**: 코드 생성 솔루션
 - **code_gen.csproj**: 코드 생성 도구 프로젝트
+
+### 빌드 출력
+- **x64/**: 컴파일된 바이너리 및 결과물 (Debug/Release 구성)
 
 ## 디버그 설정
 
@@ -207,5 +250,5 @@ second_server.exe config/second_server.config
 
 ---
 
-**마지막 업데이트**: 2026년 5월 13일  
+**마지막 업데이트**: 2026년 5월 15일  
 **문서 작성자**: Claude Haiku 4.5
