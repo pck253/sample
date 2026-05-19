@@ -19,6 +19,7 @@
 #include <concurrent_priority_queue.h>
 #include <memory>
 #include <format>
+#include <semaphore>
 
 #include <vector>
 #include <array>

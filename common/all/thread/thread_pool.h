@@ -63,18 +63,16 @@ public:
 
 		m_afterShutdown = [this]()
 			{
+				// if thread currently processing a task,
+				//   - It is terminating due to IsShutdown().
+				//   - The added job is deleted in the destructor.
+				// else
+				//   - After passing through the semaphore, the job is processed and then terminates due to IsShutdown().
 				for (auto& thread : m_threads)
 				{
-					// If the thread is currently executing a job, it does not recognize 'nodify_all'.
-					//   - After job execution is complete, if empty job, thread is blocked at 'm_jobCount.wait'.
-					// so, push dummy job
-					//   - if thread execute, while loop is break because of "IsShutdown()"
-					//   - if thread block at 'm_jobCount.wait', thread wakeup by 'nodify_all'.
 					m_jobs.push(new JobWrapper([] {}));
-					m_jobCount.fetch_add(1, std::memory_order_release);
 				}
-
-				m_jobCount.notify_all();
+				m_sem.release(m_threads.size());
 
 				for (auto& thread : m_threads)
 				{
@@ -84,6 +82,8 @@ public:
 	}
 	~ThreadPool()
 	{
+		assert(IsShutdown());
+
 		IJobWrapper* job{};
 		while (m_jobs.try_pop(job))
 		{
@@ -98,19 +98,23 @@ public:
 		{
 			m_threads.emplace_back([this]()
 				{
-					while (not IsShutdown())
+					while (true)
 					{
+						m_sem.acquire();
+
 						IJobWrapper* job{};
-						if (m_jobs.try_pop(job)) {
-							m_jobCount.fetch_sub(1, std::memory_order_acquire);
-							(*job)();
-							delete job;
-							continue;
+						while (!m_jobs.try_pop(job))
+						{
+							// May fail temporarily due to a race condition.
+							std::this_thread::yield();
 						}
 
-						auto const count{ m_jobCount.load(std::memory_order_acquire) };
-						if (0 == count) {
-							m_jobCount.wait(count);
+						(*job)();
+						delete job;
+
+						if (IsShutdown())
+						{
+							break;
 						}
 					}
 					Log("terminate thread in pool");
@@ -121,10 +125,10 @@ public:
 	template<typename T_FUNC>
 	void PushJob(T_FUNC&& _newJob)
 	{
-		m_jobs.push(new JobWrapper(std::move(_newJob)));
-		m_jobCount.fetch_add(1, std::memory_order_release);
+		static_assert(!std::is_lvalue_reference_v<T_FUNC>, "PushJob only accepts rvalue callables");
 
-		m_jobCount.notify_one();
+		m_jobs.push(new JobWrapper(std::move(_newJob)));
+		m_sem.release(1);
 	}
 
 	void PushJob(IJobWrapper* _newJob)
@@ -135,14 +139,14 @@ public:
 		}
 
 		m_jobs.push(_newJob);
-		m_jobCount.fetch_add(1, std::memory_order_release);
-
-		m_jobCount.notify_one();
+		m_sem.release(1);
 	}
 
 	template<typename T_FUNC>
 	static JobInst_t MakeJobInst(T_FUNC&& _newJob)
 	{
+		static_assert(!std::is_lvalue_reference_v<T_FUNC>, "PushJob only accepts rvalue callables");
+
 		return std::make_unique<JobWrapper<T_FUNC>>(std::move(_newJob));
 	}
 
@@ -151,5 +155,5 @@ private:
 
 	std::vector<std::thread> m_threads;
 	concurrency::concurrent_queue<IJobWrapper*> m_jobs;
-	std::atomic_int64_t m_jobCount{};
+	std::counting_semaphore<std::numeric_limits<std::ptrdiff_t>::max()> m_sem{ 0 };
 };

@@ -192,6 +192,7 @@
   <ItemGroup>
     <None Include="protocol\by_zpp_bits\definitions\client.json" />
     <None Include="protocol\by_zpp_bits\definitions\server_common.json" />
+    <None Include="protocol\by_zpp_bits\definitions\server_test.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

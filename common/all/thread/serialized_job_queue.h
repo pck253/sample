@@ -62,6 +62,8 @@ public:
 
     virtual ~SerializedJobQueue()
     {
+        assert(IsShutdown());
+
         if (!m_isFromCreateFunc)
         {
             LogWarning("this was not created from \"Create\" function.");
@@ -170,7 +172,7 @@ public:
 
         if (old != count)   // if old is count, current is 0.
         {
-            m_threadPoolRef.PushJob([jobQueue = std::move(Get())]()
+            m_threadPoolRef.PushJob([jobQueue = std::move(self)]()
                 {
                     jobQueue->ProcessJob();
                 });

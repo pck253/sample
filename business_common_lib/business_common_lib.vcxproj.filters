@@ -47,5 +47,8 @@
     <None Include="protocol\by_zpp_bits\definitions\server_common.json">
       <Filter>protocol\by_zpp_bits\definitions</Filter>
     </None>
+    <None Include="protocol\by_zpp_bits\definitions\server_test.json">
+      <Filter>protocol\by_zpp_bits\definitions</Filter>
+    </None>
   </ItemGroup>
 </Project>
