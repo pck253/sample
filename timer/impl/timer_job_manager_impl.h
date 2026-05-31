@@ -52,8 +52,7 @@ private:
 
     std::chrono::milliseconds m_timerResolution;
     std::thread m_tickThread;
-    std::mutex m_conditionVariableMutex;
-    std::condition_variable m_conditionVariable;
+    std::binary_semaphore m_tickSem{ 0 };
 
     ThreadPool& m_threadPoolRef;
     Concurrency::concurrent_priority_queue<TimerJobShared_t, TimerJobComp> m_timerJobs;

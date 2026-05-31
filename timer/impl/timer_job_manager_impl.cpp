@@ -28,17 +28,18 @@ TimerJobManagerImpl::TimerJobManagerImpl(const std::chrono::milliseconds& _timer
 
 	m_afterShutdown = [this]()
 		{
-			m_conditionVariable.notify_all();
+			m_tickSem.release();
 
 			m_tickThread.join();
 		};
 
 	m_tickThread = std::thread([this]()
 		{
+			auto waitDuration = m_timerResolution;
 			while (!IsShutdown())
 			{
-				std::unique_lock lock(m_conditionVariableMutex);
-				m_conditionVariable.wait_for(lock, m_timerResolution);
+				std::ignore = m_tickSem.try_acquire_for(waitDuration);
+				waitDuration = m_timerResolution;
 
 				TimerJobShared_t job;
 				TickTime_t current = GET_TICK();
@@ -48,9 +49,10 @@ TimerJobManagerImpl::TimerJobManagerImpl(const std::chrono::milliseconds& _timer
 					{
 						continue;
 					}
-					if (job->expireTickTime >= current)
+					if (job->expireTickTime > current)
 					{
 						m_timerJobs.push(job);
+						waitDuration = std::chrono::milliseconds(job->expireTickTime - current);
 						break;
 					}
 
@@ -101,6 +103,7 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&&
 	}
 
 	m_timerJobs.push(timerJob);
+	m_tickSem.release();
 
 	return timerJob->accessor;
 }
