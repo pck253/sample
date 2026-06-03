@@ -96,7 +96,14 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 	}
 
 	found->second.listener->support(methods::GET,
-		[this, &listenerRef = found->second, _handler](http_request _req) {
+		[this, &listenerRef = found->second, _handler](http_request _req)
+		{
+			if (IsShutdown())
+			{
+				_req.reply(status_codes::NotFound, "shutdown.");
+				return;
+			}
+
 			auto path = _req.request_uri().path();
 			auto query = web::uri::decode(_req.request_uri().query());
 
@@ -117,7 +124,14 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 		});
 
 	found->second.listener->support(methods::OPTIONS,
-		[](http_request _req) {
+		[this](http_request _req)
+		{
+			if (IsShutdown())
+			{
+				http_response response(status_codes::ServiceUnavailable);
+				_req.reply(response);
+				return;
+			}
 			http_response response(status_codes::OK);
 
 			response.headers().add(U("Access-Control-Allow-Origin"), U("*")); // allow all domain
@@ -127,7 +141,8 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 			_req.reply(response);
 		});
 	//found->second.listener->support(methods::POST,
-	//	[this, &listenerRef = found->second, _handler](http_request _req) {
+	//	[this, &listenerRef = found->second, _handler](http_request _req)
+	// {
 	//		auto path = _req.request_uri().path();
 	//		auto query = web::uri::decode(_req.request_uri().query());
 

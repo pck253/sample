@@ -92,9 +92,9 @@ void TestClient::Shutdown()
 
 	if (m_timerJobManager)
 	{
-		m_timerJobManager->Shutdown(EShutdownMode::RightNow, "test_client timer job manager shutdown.");
+		m_timerJobManager->Shutdown("test_client timer job manager shutdown.");
 	}
-	m_threadPool.Shutdown(EShutdownMode::EmptyJob, "client thread pool shutdown.");
+	m_threadPool.Shutdown("client thread pool shutdown.");
 
 	Session::UninitPacketHandlers();
 

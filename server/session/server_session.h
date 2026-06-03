@@ -10,7 +10,7 @@ public:
 
     ~ServerSession();
 
-    inline void Closed() { Shutdown(EShutdownMode::CurrentJob, "server session shutdown."); }
+    inline void Closed() { Shutdown("server session shutdown."); }
 
     static void InitPacketHandlers();
     static void UninitPacketHandlers();

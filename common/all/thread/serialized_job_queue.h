@@ -141,12 +141,6 @@ public:
 
     void ProcessJob()
     {
-        const auto shutdownMode{ m_shutdownMode.load()};
-        if (EShutdownMode::RightNow == shutdownMode || m_isStopProcessJob)
-        {
-            return;
-        }
-
         const auto count{ m_jobCount.load() };
         auto self{ Get() };
 
@@ -164,12 +158,6 @@ public:
         }
         const auto old{ m_jobCount.fetch_add(-processed) };
 
-        m_isStopProcessJob = (EShutdownMode::CurrentJob == shutdownMode);
-        if (m_isStopProcessJob)
-        {
-            return;
-        }
-
         if (old != count)   // if old is count, current is 0.
         {
             m_threadPoolRef.PushJob([jobQueue = std::move(self)]()
@@ -178,8 +166,6 @@ public:
                 });
             return;
         }
-
-        m_isStopProcessJob = (EShutdownMode::EmptyJob == shutdownMode);
         if (m_onEmptyJob)
         {
             m_onEmptyJob();
@@ -197,6 +183,4 @@ protected:
 
     std::atomic_int32_t m_jobCount{ 0 };
     Concurrency::concurrent_queue<IJobWrapper*> m_jobQueue;
-
-    bool m_isStopProcessJob{};
 };

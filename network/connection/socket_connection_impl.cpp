@@ -18,7 +18,7 @@ SocketConnectionImpl::~SocketConnectionImpl()
     SAFE_DELETE(m_socket);
     m_ioContext = nullptr;
 
-    Packet* packet = nullptr;
+    PacketInfo* packet = nullptr;
     while (m_packetBunch.try_pop(packet))
     {
         SAFE_DELETE(packet);
@@ -39,9 +39,9 @@ Result SocketConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _ser
         return EError::EmptyPacket;
     }
 
-    m_packetBunch.push(new Packet(_serializedData, _size, _deallocator));
+    m_packetBunch.push(new PacketInfo(_serializedData, _size, _deallocator));
     ++m_packetBunchCount;
-    auto old = m_packetBunchBytes.fetch_add((_size + PACKET_SIZE_BYTE));
+    const auto old = m_packetBunchBytes.fetch_add((_size + PACKET_SIZE_BYTE));
 
     if (old == 0)
     {
@@ -54,7 +54,7 @@ Result SocketConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _ser
     return EError::Success;
 }
 
-void SocketConnectionImpl::OnSend(ConnectionShared_t _self)
+void SocketConnectionImpl::OnSend(ConnectionShared_t& _self)
 {
     if (m_isClosed)
     {
@@ -71,12 +71,12 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t _self)
 
     uint32_t count = m_packetBunchCount.exchange(0);
 
-    Packet* packet = nullptr;
+    PacketInfo* packet = nullptr;
     for (uint32_t i = 0; i < count; ++i)
     {
         if (m_packetBunch.try_pop(packet))
         {
-            auto result = m_sendBuffer.Write(packet->size, packet->serializedData, m_reservedSendDatas);
+            const auto result = m_sendBuffer.Write(packet->size, packet->serializedData, m_reservedSendDatas);
             if (!result)
             {
                 SAFE_DELETE(packet);
@@ -89,6 +89,7 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t _self)
         else
         {
             LogWarning("fail pop packetBunch");
+            break;
         }
     }
 
@@ -109,10 +110,10 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t _self)
     }
 
     m_socket->async_send(buffers,
-        asio::bind_executor(*m_ioContext, std::bind(&SocketConnectionImpl::OnSent, this, std::placeholders::_1, std::placeholders::_2, _self)));
+        asio::bind_executor(*m_ioContext, std::bind(&SocketConnectionImpl::OnSent, this, std::placeholders::_1, std::placeholders::_2, std::move(_self))));
 }
 
-void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t& _bytesTransferred, ConnectionShared_t _self)
+void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self)
 {
     if (m_isClosed)
     {
@@ -121,19 +122,19 @@ void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t& 
 
     if (!_error)
     {
-        auto raminTransferredSize = _bytesTransferred;
+        auto ramainTransferredSize = _bytesTransferred;
         for (ReservedSendData_t::iterator itr = m_reservedSendDatas.begin(); itr != m_reservedSendDatas.end();)
         {
             size_t& size = std::get<BUFFER_SIZE_INDEX>(*itr);
             size_t backupSize = size;
 
-            size = (size <= raminTransferredSize) ? 0 : size - raminTransferredSize;
-            size_t thisBuffReleaseSize = (size == 0) ? backupSize : raminTransferredSize;
+            size = (size <= ramainTransferredSize) ? 0 : size - ramainTransferredSize;
+            size_t thisBuffReleaseSize = (size == 0) ? backupSize : ramainTransferredSize;
 
             SendBufferInfo* info = std::get<BUFFER_INFO_INDEX>(*itr);
             m_sendBuffer.UpdateUsedBufferInfo(info, thisBuffReleaseSize);
 
-            raminTransferredSize -= thisBuffReleaseSize;
+            ramainTransferredSize -= thisBuffReleaseSize;
             if (size == 0)
             {
                 itr = m_reservedSendDatas.erase(itr);
@@ -144,7 +145,7 @@ void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t& 
                 buffer += thisBuffReleaseSize;
                 ++itr;
             }
-            if (raminTransferredSize == 0)
+            if (ramainTransferredSize == 0)
             {
                 break;
             }
@@ -192,7 +193,7 @@ Result SocketConnectionImpl::Close(const Result& _reason)
     return EError::Success;
 }
 
-void SocketConnectionImpl::Receive()
+void SocketConnectionImpl::Receive(ConnectionShared_t& _self)
 {
     bool resetHandler = true;
     FinalJob _([&resetHandler, this]()
@@ -223,12 +224,12 @@ void SocketConnectionImpl::Receive()
         buffers.push_back(asio::buffer(buffer.first, buffer.second));
     }
     m_socket->async_receive(buffers, 0,
-        std::bind(&SocketConnectionImpl::OnReceived, this, std::placeholders::_1, std::placeholders::_2, Get()));
+        std::bind(&SocketConnectionImpl::OnReceived, this, std::placeholders::_1, std::placeholders::_2, std::move(_self)));
 
     resetHandler = false;
 }
 
-void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size_t& _bytesTransferred, ConnectionShared_t _self)
+void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self)
 {
     bool resetHandler = true;
     FinalJob _([&resetHandler, this]()
@@ -264,7 +265,7 @@ void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size
             }
         }
 
-        Receive();
+        Receive(_self);
         resetHandler = false;
     }
     else

@@ -5,27 +5,6 @@ static_assert(TIMER_MODULE == 1);
 TimerJobManagerImpl::TimerJobManagerImpl(const std::chrono::milliseconds& _timerResolution, ThreadPool& _threadPoolRef)
 	: m_timerResolution(_timerResolution), m_threadPoolRef(_threadPoolRef)
 {
-	m_beforeShutdown = [this](const EShutdownMode _reqShutdownMode)
-		{
-			switch (_reqShutdownMode)
-			{
-			case EShutdownMode::RightNow:
-				break;
-			case EShutdownMode::EmptyJob:
-			case EShutdownMode::CurrentJob:
-				{
-					LogError("timer job manager not support ShutdownMode::CurrentJob & EShutdownMode::EmptyJob.");
-				}
-				return Result(EError::NotSupportShutdownMode);
-			default:
-				{
-					LogError("wrong ShutdownMode!");
-				}
-				return Result(EError::NotSupportShutdownMode);
-			}
-			return Result();
-		};
-
 	m_afterShutdown = [this]()
 		{
 			m_tickSem.release();
@@ -74,6 +53,11 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJob(ThreadPool::JobInst_t&& _jo
 
 TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode)
 {
+	if (IsShutdown())
+	{
+		return nullptr;
+	}
+
 	TimerJobId_t identity = (++m_sequence);
 	if (!identity())
 	{
@@ -110,6 +94,11 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&&
 
 void TimerJobManagerImpl::RepeatTimerJob(const TimerJobShared_t& _timerJob, const TickTime_t& _nowTickTime)
 {
+	if (IsShutdown())
+	{
+		return;
+	}
+
 	if (_timerJob->accessor->canceled)
 	{
 		return;
@@ -180,7 +169,7 @@ TimerJobManagerAllocator::TimerJobManagerAllocator()
 
 			for (auto& manager : temp)
 			{
-				manager->Shutdown(m_shutdownMode, "timer job manager wait shutdown counter.");
+				manager->Shutdown("timer job manager wait shutdown counter.");
 			}
 
 			temp.clear();

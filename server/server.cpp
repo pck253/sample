@@ -219,9 +219,9 @@ void Server::Shutdown()
 
 	if (m_timerJobManager)
 	{
-		m_timerJobManager->Shutdown(EShutdownMode::RightNow, "timer job manager counter.");
+		m_timerJobManager->Shutdown("timer job manager counter.");
 	}
-	m_threadPool.Shutdown(EShutdownMode::EmptyJob, "thread pool shutdown.");
+	m_threadPool.Shutdown("thread pool shutdown.");
 
 	UserSession::UninitPacketHandlers();
 	ServerSession::UninitPacketHandlers();

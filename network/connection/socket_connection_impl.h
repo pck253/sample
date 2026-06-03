@@ -2,28 +2,28 @@
 
 static_assert(NETWORK_MODULE == 1);
 
-struct Packet
+struct PacketInfo : public MemPoolInstance
 {
 	const uint8_t* serializedData = nullptr;
 	PacketSize_t size = 0;
 	PacketDeallocatorShared_t deallocator;
 
-	Packet() {};
-	explicit Packet(const uint8_t* _serializedData, const PacketSize_t& _size, const PacketDeallocatorShared_t& _deallocator)
+	PacketInfo() {};
+	explicit PacketInfo(const uint8_t* _serializedData, const PacketSize_t& _size, const PacketDeallocatorShared_t& _deallocator)
 	{
 		serializedData = _serializedData;
 		size = _size;
 		deallocator = _deallocator;
 	}
 
-	explicit Packet(const Packet& _other)
+	explicit PacketInfo(const PacketInfo& _other)
 	{
 		serializedData = _other.serializedData;
 		size = _other.size;
 		deallocator = _other.deallocator;
 	}
 
-	explicit Packet(Packet&& _other) noexcept
+	explicit PacketInfo(PacketInfo&& _other) noexcept
 	{
 		serializedData = _other.serializedData;
 		size = _other.size;
@@ -33,11 +33,11 @@ struct Packet
 		_other.size = 0;
 	}
 
-	~Packet()
+	~PacketInfo()
 	{
 	}
 
-	Packet& operator=(const Packet& _other)
+	PacketInfo& operator=(const PacketInfo& _other)
 	{
 		serializedData = _other.serializedData;
 		size = _other.size;
@@ -46,7 +46,7 @@ struct Packet
 		return *this;
 	}
 
-	Packet& operator=(Packet&& _other) noexcept
+	PacketInfo& operator=(PacketInfo&& _other) noexcept
 	{
 		serializedData = _other.serializedData;
 		size = _other.size;
@@ -78,7 +78,8 @@ public:
     void InitReceive()
     {
         std::call_once(m_initReceiveFlag, [this]() {
-                Receive();
+				auto self = Get();
+                Receive(self);
             });
     }
 
@@ -86,11 +87,11 @@ private:
     SocketConnectionImpl(asio::ip::tcp::socket* _socket, const ConnectionId_t _connectionId, asio::io_context* _ioContext,
 		const bool& _isPublic, const AcceptorIndex& _acceptorIndex, ConnectionManager& _connectionManager, const ReceivedHandler_t _receivedHandler, const ClosedHandler_t _closedHandler);
 
-    void Receive();
+    void Receive(ConnectionShared_t& _self);
 
-    void OnSend(ConnectionShared_t _self);
-    void OnSent(const asio::error_code& _error, const size_t& _bytesTransferred, ConnectionShared_t _self);
-    void OnReceived(const asio::error_code& _error, const size_t& _bytesTransferred, ConnectionShared_t _self);
+    void OnSend(ConnectionShared_t& _self);
+    void OnSent(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self);
+    void OnReceived(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self);
 
 private:
     asio::io_context* m_ioContext = nullptr;
@@ -102,7 +103,7 @@ private:
 
 	std::atomic<size_t> m_packetBunchBytes = 0;		// this is used to call OnSend on successful send(=OnSent) or when not be sending.
     std::atomic_uint32_t m_packetBunchCount = 0;	// this is used to move m_packetBunch to m_reservedSendDatas.
-    Concurrency::concurrent_queue<Packet*> m_packetBunch;
+    Concurrency::concurrent_queue<PacketInfo*> m_packetBunch;
 
     ReservedSendData_t m_reservedSendDatas;
     SendBuffer m_sendBuffer;

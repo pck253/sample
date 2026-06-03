@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 class ThreadPool final : public UseShutdown
 {
@@ -33,32 +33,12 @@ public:
 	ThreadPool(const std::string& _name)
 		: m_name(_name)
 	{
-		m_beforeShutdown = [this](const EShutdownMode _reqShutdownMode)
+		m_beforeShutdown = [this]()
 			{
-				switch (_reqShutdownMode)
+				while (not m_jobs.empty())
 				{
-				case EShutdownMode::RightNow:
-					break;
-				case EShutdownMode::EmptyJob:
-					{
-						while(not m_jobs.empty())
-						{
-							Log("{} Shutdown : waiting until thread pool is empty.", m_name);
-						}
-					}
-					break;
-				case EShutdownMode::CurrentJob:
-					{
-						LogError("thread pool not support ShutdownMode::CurrentJob.");
-					}
-					return Result(EError::NotSupportShutdownMode);
-				default:
-					{
-						LogError("wrong ShutdownMode!");
-					}
-					return Result(EError::NotSupportShutdownMode);
+					Log("{} Shutdown : waiting until thread pool is empty.", m_name);
 				}
-				return Result();
 			};
 
 		m_afterShutdown = [this]()
@@ -103,10 +83,9 @@ public:
 						m_sem.acquire();
 
 						IJobWrapper* job{};
-						while (!m_jobs.try_pop(job))
+						if (!m_jobs.try_pop(job))
 						{
-							// May fail temporarily due to a race condition.
-							std::this_thread::yield();
+							continue;
 						}
 
 						(*job)();

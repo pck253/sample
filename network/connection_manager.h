@@ -63,19 +63,8 @@ protected:
 	}
 	void ShutdownThreadPool()
 	{
-		switch (m_threadPoolType)
-		{
-		case EThreadPool::ASIO:
-			{
-				m_asioThreadPool.Shutdown();
-			}
-			break;
-		case EThreadPool::CV:
-			{
-				m_cvThreadPool.Shutdown(EShutdownMode::EmptyJob, "ConnectionManager's thread pool shutdown.");
-			}
-			break;
-		}
+		m_asioThreadPool.Shutdown();
+		m_cvThreadPool.Shutdown("ConnectionManager's thread pool shutdown.");
 	}
 
 	asio::io_context* GetAsioContext()

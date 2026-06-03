@@ -24,7 +24,7 @@ void Session::Close(const Result& _reason)
 
 void Session::Closed(const Result& _result)
 {
-	Shutdown(EShutdownMode::RightNow, "test_client session shutdown.");
+	Shutdown("test_client session shutdown.");
 }
 
 void Session::InitPacketHandlers()

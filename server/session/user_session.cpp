@@ -23,7 +23,7 @@ void UserSession::Close(const Result& _reason)
 
 void UserSession::Closed(const Result& _result)
 {
-	Shutdown(EShutdownMode::RightNow, "user session shutdown.");
+	Shutdown("user session shutdown.");
 }
 
 void UserSession::InitPacketHandlers()

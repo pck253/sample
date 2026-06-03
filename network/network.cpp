@@ -106,7 +106,7 @@ Result Network::InitImpl()
 
 void Network::Shutdown()
 {
-	m_listener.Shutdown(EShutdownMode::EmptyJob, "listener shutdown.");
-	m_connecter.Shutdown(EShutdownMode::EmptyJob, "connecter shutdown.");
-	m_imnManager.Shutdown(EShutdownMode::EmptyJob, "internal module network shutdown.");
+	m_listener.Shutdown("listener shutdown.");
+	m_connecter.Shutdown("connecter shutdown.");
+	m_imnManager.Shutdown("internal module network shutdown.");
 }

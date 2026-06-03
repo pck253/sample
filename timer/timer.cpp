@@ -21,5 +21,5 @@ Result Timer::InitImpl()
 
 void Timer::Shutdown()
 {
-	m_timerJobManagerAllocator.Shutdown(EShutdownMode::RightNow, "timer ticker allocator shutdown.");
+	m_timerJobManagerAllocator.Shutdown("timer ticker allocator shutdown.");
 }

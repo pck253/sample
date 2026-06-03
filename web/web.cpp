@@ -88,7 +88,7 @@ Result Web::InitImpl()
 
 void Web::Shutdown()
 {
-	m_restful.Shutdown(EShutdownMode::RightNow, "restful shutdown.");
+	m_restful.Shutdown("restful shutdown.");
 
 	curl_global_cleanup();
 }
