@@ -12,6 +12,19 @@
     {
       "name": "Shutdown",
       "fields": []
+    },
+    {
+      "name": "Ping",
+      "fields": [
+        { "type": "Time_t", "name": "timestamp" }
+      ]
+    },
+    {
+      "name": "Pong",
+      "fields": [
+        { "type": "Time_t", "name": "timestamp" },
+        { "type": "Time_t", "name": "relayTimestamp" }
+      ]
     }
   ]
 }

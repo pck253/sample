@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #define INVALID_SERVER_SERIAL 0
 
@@ -101,6 +101,8 @@ protected:
 	{
 		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Activation, new ZppBitsPacketHandleCaller<T, ServerCommon::Activation>([](const T&) { return true; }));
 		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Shutdown, new ZppBitsPacketHandleCaller<T, ServerCommon::Shutdown>([](const T&) { return true; }));
+		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Ping, new ZppBitsPacketHandleCaller<T, ServerCommon::Ping>([](const T&) { return true; }));
+		m_commonPacketHandlerCallers.emplace(ServerCommon::EProtocol::Pong, new ZppBitsPacketHandleCaller<T, ServerCommon::Pong>([](const T&) { return true; }));
 	}
 
 	static void UninitCommonPacketHandlers()
