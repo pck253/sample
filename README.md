@@ -16,6 +16,7 @@
 - **JSON 처리**: nlohmann/json
 - **웹 프레임워크**: C++ REST SDK (Casablanca)
 - **네트워크**: ASIO (Asynchronous I/O)
+- **HTTP 클라이언트**: curl
 - **스케줄링**: croncpp
 
 ## 프로젝트 구조
@@ -183,20 +184,7 @@ JSON 기반 설정으로 모듈 로드 및 초기화 관리:
 
 ### 사전 준비
 
-#### 1) cpprest 런타임 DLL
-
-cpprest는 소스 없이 바이너리만 포함되어 있습니다.
-`lib/`의 임포트 라이브러리는 형상관리에 포함되지만, `bin/`의 런타임 DLL은 `.gitignore`의 `[Bb]in/` 규칙에 걸려 빠지므로 별도로 확보해야 합니다.
-
-```
-sdk/cpprest/lib/cpprest142_2_10{,d}.lib    # 포함됨 (링크용)
-sdk/cpprest/bin/cpprest142_2_10{,d}.dll    # 빠짐  (런타임)
-```
-
-`web.vcxproj`의 **PreLink 이벤트**가 이 DLL을 출력 폴더로 복사하므로 별도 배포 작업은 필요 없습니다.
-DLL이 없으면 링크 이전에 `xcopy`가 먼저 실패합니다 (`MSB3073`).
-
-#### 2) 코드 생성 도구
+#### 코드 생성 도구
 
 `business_common_lib`의 사전 빌드 단계가 `code_gen.exe`로 패킷 헤더를 생성하므로 코드 생성 도구를 먼저 빌드합니다.
 
@@ -234,7 +222,6 @@ http://127.0.0.1:30001/shutdown
 ## 종료 처리
 
 모듈과 그 하위 객체들을 정해진 순서로, 서로의 스레드를 기다려가며 안전하게 내리기 위한 구조입니다.
-콜백(`m_beforeShutdown` / `m_afterShutdown`) 방식과 바쁜 대기 루프를 걷어내고 **단계(step) 큐**로 대체했습니다.
 
 ### ShutdownCoordinator
 
@@ -342,10 +329,9 @@ Application 종료 요청 (restful /shutdown 또는 원격 ServerCommon::Shutdow
 | C++ REST SDK | - | RESTful API 서버 |
 | nlohmann/json | 3.11.2 | JSON 파싱 및 생성 |
 | zpp_bits | - | 고성능 직렬화 |
+| curl | 8.5.0 | HTTP 클라이언트 |
 | croncpp | - | 주기적 작업 스케줄링 |
 | magic_enum | - | 열거형 이름 문자열화 (로그/포맷터) |
-
-> `sdk/curl-8.5.0/` 소스는 남아 있으나 현재 어떤 모듈도 링크하지 않습니다. HTTP 클라이언트가 필요해지면 web 모듈에 다시 연결해야 합니다.
 
 ## 프로젝트 구성 파일
 
