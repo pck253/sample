@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 enum class ELogLevel : uint8_t
 {
@@ -48,7 +48,7 @@ public:
 
 	inline bool IsUsingDebugLogCategory(const ELogCategory& _debugCategory)
 	{
-		return (m_useDebugLogCategory.find(_debugCategory) != m_useDebugLogCategory.end());
+		return m_useDebugLogCategory.contains(_debugCategory);
 	}
 
 private:
@@ -60,9 +60,25 @@ private:
 	std::unordered_set<ELogCategory> m_useDebugLogCategory;
 };
 
-extern Logger g_logger;
+inline Logger g_logger;
 
-#define Log(f, ...)				g_logger.Write(ELogLevel::Normal, std::format(f, __VA_ARGS__).c_str());
-#define LogError(f, ...)		g_logger.Write(ELogLevel::Error, std::format(f, __VA_ARGS__).c_str());
-#define LogWarning(f, ...)		g_logger.Write(ELogLevel::Warning, std::format(f, __VA_ARGS__).c_str());
-#define LogDebug(cate, f, ...)	if (g_logger.IsUsingDebugLogCategory(cate)) g_logger.Write(ELogLevel::Debug, std::format(f, __VA_ARGS__).c_str());
+template <typename... Args>
+inline void LogImpl(const ELogLevel _logLevel, const char* _function, const int _line, std::format_string<Args...> _fmt, Args&&... _args)
+{
+	g_logger.Write(_logLevel, std::format("[{}:{}] {}", _function, _line, std::format(_fmt, std::forward<Args>(_args)...)).c_str());
+}
+
+template <typename... Args>
+inline void LogDebugImpl(const ELogCategory _category, const char* _function, const int _line, std::format_string<Args...> _fmt, Args&&... _args)
+{
+	if (g_logger.IsUsingDebugLogCategory(_category))
+	{
+		LogImpl(ELogLevel::Debug, _function, _line, _fmt, std::forward<Args>(_args)...);
+	}
+}
+
+// macros, not functions: __FUNCTION__ / __LINE__ have to be expanded at the call site.
+#define Log(...)					LogImpl(ELogLevel::Normal, __FUNCTION__, __LINE__, __VA_ARGS__)
+#define LogError(...)				LogImpl(ELogLevel::Error, __FUNCTION__, __LINE__, __VA_ARGS__)
+#define LogWarning(...)				LogImpl(ELogLevel::Warning, __FUNCTION__, __LINE__, __VA_ARGS__)
+#define LogDebug(_category, ...)	LogDebugImpl(_category, __FUNCTION__, __LINE__, __VA_ARGS__)

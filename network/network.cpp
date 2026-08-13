@@ -4,8 +4,8 @@ static_assert(NETWORK_MODULE == 1);
 
 MODULE_STATIC_IMPL(Network);
 
-Network::Network(const std::string& _configFilePath)
-	: Module(_configFilePath),
+Network::Network(Application& _application, const std::string& _configFilePath)
+	: Module(_application, _configFilePath),
 	m_listener(this),
 	m_connecter(this),
 	m_imnManager(this)
@@ -106,7 +106,9 @@ Result Network::InitImpl()
 
 void Network::Shutdown()
 {
-	m_listener.Shutdown("listener shutdown.");
-	m_connecter.Shutdown("connecter shutdown.");
-	m_imnManager.Shutdown("internal module network shutdown.");
+	m_listener.Shutdown(m_shutdownCoordinator, "listener shutdown.");
+	m_connecter.Shutdown(m_shutdownCoordinator, "connecter shutdown.");
+	m_imnManager.Shutdown(m_shutdownCoordinator, "internal module network shutdown.");
+
+	m_shutdownCoordinator.Run();
 }

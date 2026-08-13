@@ -128,7 +128,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\cpprest\include;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;$(SolutionDir)sdk\curl-8.5.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\magic_enum\include\;$(SolutionDir)sdk\cpprest\include;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;$(SolutionDir)sdk\curl-8.5.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
@@ -153,7 +153,7 @@ echo f | xcopy "$(SolutionDir)sdk\curl-8.5.0\x64\debug\libcurl.dll"  "$(OutDir)\
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\cpprest\include;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;$(SolutionDir)sdk\curl-8.5.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)common\;$(SolutionDir)sdk\magic_enum\include\;$(SolutionDir)sdk\cpprest\include;$(SolutionDir)sdk\nlohmann.json.3.11.2\include\;$(SolutionDir)sdk\curl-8.5.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>

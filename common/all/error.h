@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 enum class EError : uint32_t
 {
@@ -71,16 +71,18 @@ enum class EError : uint32_t
 	Shutdown,
 	NotSupportShutdownMode,
 	EmptyPacket,
-	FailedLogin
+	FailedLogin,
+	NotInWorld,
+	NotInitializedRestful
 };
 
 template <>
 struct std::formatter<EError, char> : std::formatter<int, char>
 {
-	template <class FormatContext>
-	auto format(const EError& _Val, FormatContext& _formatCtx) const
+	template <class T_FORMAT_CONTEXT>
+	auto format(const EError& _Val, T_FORMAT_CONTEXT& _formatCtx) const
 	{
-		return std::format_to(_formatCtx.out(), "{}", std::underlying_type_t<EError>(_Val));
+		return std::format_to(_formatCtx.out(), "{}", magic_enum::enum_name(_Val));
 	}
 };
 
@@ -158,8 +160,8 @@ struct Result
 template <>
 struct std::formatter<Result, char> : std::formatter<int, char>
 {
-	template <class FormatContext>
-	auto format(const Result& _val, FormatContext& _formatCtx) const
+	template <class T_FORMAT_CONTEXT>
+	auto format(const Result& _val, T_FORMAT_CONTEXT& _formatCtx) const
 	{
 		if (_val.message.empty())
 		{

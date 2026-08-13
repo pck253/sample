@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #define WIN32_LEAN_AND_MEAN
 
@@ -20,14 +20,22 @@
 #include <memory>
 #include <format>
 #include <semaphore>
+#include <tuple>
 
 #include <vector>
 #include <array>
 #include <queue>
+#include <deque>
 #include <map>
 #include <unordered_map>
 #include <set>
 #include <unordered_set>
+#include <random>
+#include <numbers>
+
+#define MAGIC_ENUM_RANGE_MIN 0
+#define MAGIC_ENUM_RANGE_MAX 256
+#include "magic_enum/magic_enum.hpp"
 
 #ifdef _DEBUG
 #define FLATBUFFERS_MEMORY_LEAK_TRACKING
@@ -45,8 +53,11 @@ using SerializedJobQueueShared_t = std::shared_ptr<SerializedJobQueue>;
 #include "all/error.h"
 #include "all/math/math_common.h"
 #include "all/utility/time_utility.h"
+#include "all/utility/id_utility.h"
+#include "all/utility/random_utility.h"
 #include "all/utility/etc_utility.h"
 #include "all/utility/string_utility.h"
+#include "all/utility/shutdown_coordinator.h"
 #include "all/utility/shutdown_utility.h"
 #include "all/utility/stl_utility.h"
 #include "all/thread/thread_pool.h"

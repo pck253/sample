@@ -7,21 +7,22 @@ static_assert(NETWORK_MODULE == 1);
 #endif
 
 SocketConnectionImpl::SocketConnectionImpl(asio::ip::tcp::socket* _socket, const ConnectionId_t _connectionId, asio::io_context* _ioContext,
-    const bool& _isPublic, const AcceptorIndex& _acceptorIndex, ConnectionManager& _connectionManager, const ReceivedHandler_t _receivedHandler, const ClosedHandler_t _closedHandler)
+    const bool& _isPublic, const AcceptorIndex& _acceptorIndex, ConnectionManager& _connectionManager, const ReceivedHandler_t _receivedHandler)
     : Connection(_connectionId, _isPublic),
-    m_socket(_socket), m_ioContext(_ioContext), m_acceptorIndex(_acceptorIndex), m_connectionManager(_connectionManager), m_receivedHandler(_receivedHandler), m_closedHandler(_closedHandler)
+    m_ioContext(_ioContext), m_socket(_socket), m_strand(asio::make_strand(*_ioContext)),
+    m_acceptorIndex(_acceptorIndex), m_connectionManager(_connectionManager), m_receivedHandler(_receivedHandler)
 {
 }
 
 SocketConnectionImpl::~SocketConnectionImpl()
 {
-    SAFE_DELETE(m_socket);
+    SafeDelete(m_socket);
     m_ioContext = nullptr;
 
     PacketInfo* packet = nullptr;
     while (m_packetBunch.try_pop(packet))
     {
-        SAFE_DELETE(packet);
+        SafeDelete(packet);
     }
 
     Log("SocketConnectionImpl is deleted. connection id={}", m_connectionId);
@@ -43,24 +44,19 @@ Result SocketConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _ser
     ++m_packetBunchCount;
     const auto old = m_packetBunchBytes.fetch_add((_size + PACKET_SIZE_BYTE));
 
-    if (old == 0)
+    if (0 == old)
     {
 #ifdef CHECK_ONSEND_DUPLICATE_CALL
         ++m_onSendCallCount;
 #endif
-        asio::post(asio::bind_executor(*m_ioContext, std::bind(&SocketConnectionImpl::OnSend, this, Get())));
+        OnSend(Get());
     }
 
     return EError::Success;
 }
 
-void SocketConnectionImpl::OnSend(ConnectionShared_t& _self)
+void SocketConnectionImpl::OnSend(ConnectionShared_t&& _self)
 {
-    if (m_isClosed)
-    {
-        return;
-    }
-
 #ifdef CHECK_ONSEND_DUPLICATE_CALL
     --m_onSendCallCount;
     if (m_onSendCallCount > 0)
@@ -68,6 +64,11 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t& _self)
         LogError("OnSend call duplication.");
     }
 #endif
+
+    if (m_isClosed)
+    {
+        return;
+    }
 
     uint32_t count = m_packetBunchCount.exchange(0);
 
@@ -79,12 +80,12 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t& _self)
             const auto result = m_sendBuffer.Write(packet->size, packet->serializedData, m_reservedSendDatas);
             if (!result)
             {
-                SAFE_DELETE(packet);
+                SafeDelete(packet);
                 LogWarning("not exist send buffer.");
                 Close(result);
                 return;
             }
-            SAFE_DELETE(packet);
+            SafeDelete(packet);
         }
         else
         {
@@ -109,11 +110,25 @@ void SocketConnectionImpl::OnSend(ConnectionShared_t& _self)
         buffers.push_back(asio::buffer(buffer, size));
     }
 
-    m_socket->async_send(buffers,
-        asio::bind_executor(*m_ioContext, std::bind(&SocketConnectionImpl::OnSent, this, std::placeholders::_1, std::placeholders::_2, std::move(_self))));
+    asio::post(m_strand,
+        [self = std::move(_self), this, buffers = std::move(buffers)]() mutable
+        {
+            if (m_isClosed)
+            {
+                return;
+            }
+
+            m_socket->async_send(
+                buffers,
+                [this, self = std::move(self)]
+                (const asio::error_code& error, size_t bytesTransferred) mutable
+                {
+                    OnSent(error, bytesTransferred, std::move(self));
+                });
+        });
 }
 
-void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self)
+void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t&& _self)
 {
     if (m_isClosed)
     {
@@ -129,13 +144,13 @@ void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _
             size_t backupSize = size;
 
             size = (size <= ramainTransferredSize) ? 0 : size - ramainTransferredSize;
-            size_t thisBuffReleaseSize = (size == 0) ? backupSize : ramainTransferredSize;
+            size_t thisBuffReleaseSize = (0 == size) ? backupSize : ramainTransferredSize;
 
             SendBufferInfo* info = std::get<BUFFER_INFO_INDEX>(*itr);
             m_sendBuffer.UpdateUsedBufferInfo(info, thisBuffReleaseSize);
 
             ramainTransferredSize -= thisBuffReleaseSize;
-            if (size == 0)
+            if (0 == size)
             {
                 itr = m_reservedSendDatas.erase(itr);
             }
@@ -145,7 +160,7 @@ void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _
                 buffer += thisBuffReleaseSize;
                 ++itr;
             }
-            if (ramainTransferredSize == 0)
+            if (0 == ramainTransferredSize)
             {
                 break;
             }
@@ -157,7 +172,7 @@ void SocketConnectionImpl::OnSent(const asio::error_code& _error, const size_t _
 #ifdef CHECK_ONSEND_DUPLICATE_CALL
             ++m_onSendCallCount;
 #endif
-            OnSend(_self);
+            OnSend(std::move(_self));
         }
     }
     else
@@ -175,37 +190,26 @@ Result SocketConnectionImpl::Close(const Result& _reason)
         return EError::ClosedSocket;
     }
 
-    asio::error_code ec;
-    m_socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec); // no more can't request async job
-    m_socket->close(ec);    // disconnect && destroy socket
-
-    if (m_closedHandler)
-    {
-        (*m_closedHandler)(_reason, GetConnectionId(), m_isPublic);
-        m_closedHandler = nullptr;
-    }
-
-    // Asynchronously call reason
+    // OnClosed also runs in this job, so it stays asynchronous to the caller :
     //   - m_connectionManager is call connection instance's member function : flow is top-down => ok
     //   - connection instance is call connection m_connectionManager 's member function : flow is down-top => possible dead lock
-    asio::post(asio::bind_executor(*m_ioContext, std::bind(&ConnectionManager::OnClosed, &m_connectionManager, GetConnectionId(), m_isPublic)));
+    asio::post(m_strand, [self = Get(), this, _reason]()
+        {
+            asio::error_code ec;
+            m_socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec); // no more can't request async job
+            m_socket->close(ec);    // disconnect && destroy socket
+
+            m_connectionManager.OnClosed(_reason, GetConnectionId(), m_isPublic);
+        });
 
     return EError::Success;
 }
 
-void SocketConnectionImpl::Receive(ConnectionShared_t& _self)
+void SocketConnectionImpl::Receive(ConnectionShared_t&& _self)
 {
-    bool resetHandler = true;
-    FinalJob _([&resetHandler, this]()
-        {
-            if (resetHandler)
-            {
-                m_receivedHandler = nullptr;
-            }
-        });
-
     if (m_isClosed)
     {
+        m_receivedHandler = {};
         return;
     }
 
@@ -223,25 +227,32 @@ void SocketConnectionImpl::Receive(ConnectionShared_t& _self)
     {
         buffers.push_back(asio::buffer(buffer.first, buffer.second));
     }
-    m_socket->async_receive(buffers, 0,
-        std::bind(&SocketConnectionImpl::OnReceived, this, std::placeholders::_1, std::placeholders::_2, std::move(_self)));
 
-    resetHandler = false;
+    asio::post(m_strand,
+        [self = std::move(_self), this, buffers = std::move(buffers)]() mutable
+        {
+            if (m_isClosed)
+            {
+                m_receivedHandler = {};
+                return;
+            }
+
+            m_socket->async_receive(
+                buffers,
+                0,
+                [this, self = std::move(self)]
+                (const asio::error_code& error, size_t bytesTransferred) mutable
+                {
+                    OnReceived(error, bytesTransferred, std::move(self));
+                });
+        });
 }
 
-void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t& _self)
+void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size_t _bytesTransferred, ConnectionShared_t&& _self)
 {
-    bool resetHandler = true;
-    FinalJob _([&resetHandler, this]()
-        {
-            if (resetHandler)
-            {
-                m_receivedHandler = nullptr;
-            }
-        });
-
     if (m_isClosed)
     {
+        m_receivedHandler = {};
         return;
     }
 
@@ -265,8 +276,7 @@ void SocketConnectionImpl::OnReceived(const asio::error_code& _error, const size
             }
         }
 
-        Receive(_self);
-        resetHandler = false;
+        Receive(std::move(_self));
     }
     else
     {

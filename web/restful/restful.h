@@ -2,26 +2,23 @@
 
 static_assert(WEB_MODULE == 1);
 
+enum class EListenerState : uint8_t
+{
+    None = 0,
+    Opening,	// SetRestfulHandler is running. the shutdown handler waits on this.
+    Opened,
+    Closed,
+};
+
 struct RestfulListenerInfo
 {
-    RestfulListenerInfo(http_listener* _listener)
-        : listener(_listener)
+    RestfulListenerInfo(std::unique_ptr<http_listener>&& _listener)
+        : listener(std::move(_listener))
     {
     }
-    RestfulListenerInfo(RestfulListenerInfo&& _other)
-    {
-        listener = _other.listener;
-        nowUsing = _other.nowUsing.load();
 
-    }
-    const RestfulListenerInfo& operator = (RestfulListenerInfo&& _other)
-    {
-        listener = _other.listener;
-        nowUsing = _other.nowUsing.load();
-        return *this;
-    }
-    http_listener* listener = nullptr;
-    std::atomic_bool nowUsing = false;
+    std::unique_ptr<http_listener> listener;
+    std::atomic<EListenerState> state = EListenerState::None;
 };
 
 class Web;
@@ -36,12 +33,20 @@ public:
     Result SetRestfulHandler(const std::string& _listenerName, const RestfulHandler_t _handler);
     void Response(const RestufulRequestId_t& _requestId, nlohmann::json&& _reply);
 
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
+
 private:
     Web& m_webModule;
 
+	std::atomic_bool m_initialized = false;
 	std::unordered_map<std::string, RestfulListenerInfo> m_restfulListeners;
 
-    std::atomic<RestufulRequestId_t::IdType> m_restfulReqIdSequence{ RestufulRequestId_t::GetInvalidValue() };
+    std::atomic<RestufulRequestId_t> m_restfulReqIdSequence{ std::numeric_limits<RestufulRequestId_t>::min() };
 	std::shared_mutex m_restfulRequestMutex;
 	std::unordered_map<RestufulRequestId_t, http_request> m_waitRestfulRequests;
+
+	std::atomic<int32_t> m_inFlightRequests{ 0 };
+
+	std::vector<std::pair<std::string, pplx::task<void>>> m_closingListeners;
 };

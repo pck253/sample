@@ -22,8 +22,5 @@
     <Filter Include="restful">
       <UniqueIdentifier>{82b29fba-4173-4d37-91c2-df3181513a87}</UniqueIdentifier>
     </Filter>
-    <Filter Include="curl">
-      <UniqueIdentifier>{5937b26c-0523-41c4-81e9-81458c68a4d3}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
 </Project>

@@ -1,12 +1,12 @@
-﻿#pragma once
+#pragma once
 
 // utc
 using ProfileTime_t = std::time_t;	// nanosecond for utc 0
 using Time_t = std::time_t;	// millisecond for utc 0
 
 // tick
-using ProfileTickTime_t = std::time_t;	// nanosecond for tick
-using TickTime_t = std::time_t;	// millisecond for tick
+using ProfileSteadyTime_t = std::time_t;	// nanosecond for tick
+using SteadyTime_t = std::time_t;	// millisecond for tick
 
 // duration
 using DurationTimeSec_t = std::time_t;
@@ -14,12 +14,12 @@ using DurationTimeMs_t = std::time_t;
 
 namespace TimeUnit
 {
-	constexpr float UsToNs = 1000.0f;	// microsecond -> nanosecond
-	constexpr float MsToUs = 1000.0f;   // millisecond -> microsecond
-	constexpr float SecToMs = 1000.0f;	// second -> millisecond
-	constexpr float MinuteToSec = 60.0f;
-	constexpr float HourToSec = 60.0f * MinuteToSec;
-	constexpr float DayToSec = 24.0f * MinuteToSec;
+	constexpr double US_TO_NS = 1000.0f;	// microsecond -> nanosecond
+	constexpr double MS_TO_US = 1000.0f;	// millisecond -> microsecond
+	constexpr double SEC_TO_MS = 1000.0f;	// second -> millisecond
+	constexpr double MINUTE_TO_SEC = 60.0f;
+	constexpr double HOUR_TO_SEC = 60.0f * MINUTE_TO_SEC;
+	constexpr double DAY_TO_SEC = 24.0f * MINUTE_TO_SEC;
 }
 
 struct StartTime
@@ -43,22 +43,38 @@ struct StartTime
 		startLocalMidNightUtc = std::mktime(&localTm);
 	}
 
-	Time_t GetLocalMidNightUtc(const TickTime_t& _time)
+	Time_t GetLocalMidNightUtc(const SteadyTime_t& _time) const
 	{
 		static std::time_t startMilliSeconds = std::chrono::duration_cast<std::chrono::milliseconds>(startTime.time_since_epoch()).count();
-		static constexpr auto DayToMilliSeconds = (TimeUnit::DayToSec * TimeUnit::SecToMs);
+		static constexpr auto DAY_TO_MILLI_SECONDS = (TimeUnit::DAY_TO_SEC * TimeUnit::SEC_TO_MS);
 
-		int dayDiff = static_cast<int>((_time - startMilliSeconds) / DayToMilliSeconds);
-		return startLocalMidNightUtc + static_cast<Time_t>((dayDiff * DayToMilliSeconds) / TimeUnit::SecToMs);
+		auto dayDiff = static_cast<Time_t>((_time - startMilliSeconds) / DAY_TO_MILLI_SECONDS);
+		return startLocalMidNightUtc + static_cast<Time_t>((dayDiff * DAY_TO_MILLI_SECONDS) / TimeUnit::SEC_TO_MS);
 	}
 };
 
-extern StartTime g_startTime;
+inline StartTime g_startTime;
 
 // utc(ProfileTime_t, Time_t)
-#define GET_PROFILE_TIME() (g_startTime.startTime + (std::chrono::steady_clock::now() - g_startTime.startTick)).time_since_epoch().count()	// nanosecond for utc 0
-#define GET_TIME() std::chrono::duration_cast<std::chrono::milliseconds>((g_startTime.startTime + (std::chrono::steady_clock::now() - g_startTime.startTick)).time_since_epoch()).count()	// millisecond for utc 0
+inline auto GetProfileTime()
+{
+	// nanosecond for utc 0
+	return (g_startTime.startTime + (std::chrono::steady_clock::now() - g_startTime.startTick)).time_since_epoch().count();
+}
+inline auto GetTime()
+{
+	// millisecond for utc 0
+	return std::chrono::duration_cast<std::chrono::milliseconds>((g_startTime.startTime + (std::chrono::steady_clock::now() - g_startTime.startTick)).time_since_epoch()).count();
+}
 
-// tick(ProfileTickTime_t, TickTime_t)
-#define GET_PROFILE_TICK() std::chrono::steady_clock::now().time_since_epoch().count()	// nanosecond for tick
-#define GET_TICK() std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()	// millisecond for tick
+// tick(ProfileSteadyTime_t, SteadyTime_t)
+inline auto GetProfileSteadyTime()
+{
+	// nanosecond for tick
+	return std::chrono::steady_clock::now().time_since_epoch().count();
+}
+inline auto GetSteadyTime()
+{
+	// millisecond for tick
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}

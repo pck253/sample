@@ -4,14 +4,16 @@ class TestClient : public Module
 {
     friend Module;
 public:
-    TestClient(const std::string& _configFilePath);
+    TestClient(Application& _application, const std::string& _configFilePath);
     ~TestClient();
 
     virtual bool IsBusinessModule() final { return true; }
     virtual EModule GetModuleType() final { return EModule::TestClient; }
     
+protected:
     virtual void Shutdown() final;
 
+public:
     SessionShared_t Connected(ConnectionShared_t _conn);
     SessionShared_t GetSession() const { return m_session; }
 

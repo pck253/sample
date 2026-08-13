@@ -30,7 +30,11 @@ void NetworkAccessorImpl::StopPublicListen(const std::string& _listenerName)
 	m_networkModule.GetListener().StopPublicListen(_listenerName);
 }
 
-void NetworkAccessorImpl::ClosePublicConnection(const std::string& _listenerName)
+bool NetworkAccessorImpl::IsEmptyPublicConnection(const std::string& _listenerName) const
 {
-	m_networkModule.GetListener().ClosePublicConnection(_listenerName);
+	if (m_networkModule.IsRedirectToImn(_listenerName))
+	{
+		return true;
+	}
+	return m_networkModule.GetListener().IsEmptyPublicConnection(_listenerName);
 }

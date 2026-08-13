@@ -1,6 +1,6 @@
-﻿#pragma once
+#pragma once
 
-#define	EPSILON (1.e-4f)
+static constexpr double EPSILON{ 1.e-4f };
 
 template<typename T> requires std::is_arithmetic<T>::value
 struct Vector2d
@@ -60,14 +60,17 @@ struct Vector2d
 		return Vector2d<T>(x - _other.x, y - _other.y);
 	}
 
-	inline bool IsZero() const { return ((x + y) == 0); }
+	inline bool IsInvalid() const { return ((x + y) == 0); }
 };
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename T> requires std::is_arithmetic<T>::value
+template<typename T, T MIN_VALUE>
+	requires std::is_arithmetic<T>::value && (!std::is_same_v<T, bool>) && (MIN_VALUE > std::numeric_limits<T>::lowest())
 struct Vector
 {
+	static constexpr auto PI = std::numbers::template pi_v<T>;
+
 	using ValueType_t = T;
 	T x{};
 	T y{};
@@ -75,72 +78,106 @@ struct Vector
 
 	void Reset()
 	{
-		x = {};
-		y = {};
-		z = {};
+		x = y = z = std::numeric_limits<T>::lowest();
 	}
 
-	bool operator!=(const Vector<T>_other)
+	void SetZero()
+	{
+		x = y = z = 0;
+	}
+
+	bool operator!=(const Vector<T, MIN_VALUE>& _other) const
 	{
 		return (x != _other.x || y != _other.y || z != _other.z);
 	}
-	bool operator==(const Vector<T>& _other)
+	bool operator==(const Vector<T, MIN_VALUE>& _other) const
 	{
 		return (x == _other.x && y == _other.y && z == _other.z);
 	}
 
 	template<typename VT> requires std::is_arithmetic<VT>::value
-	Vector<T> operator*(const VT& _value) const
+	Vector operator*(const VT& _value) const
 	{
-		return Vector<T>((T)(x * _value), (T)(y * _value), (T)(z * _value));
+		return Vector((T)(x * _value), (T)(y * _value), (T)(z * _value));
 	}
 
 	template<typename VT> requires std::is_arithmetic<VT>::value
-	Vector<T> operator/(const VT& _value) const
+	Vector operator/(const VT& _value) const
 	{
-		return Vector<T>((T)(x / _value), (T)(y / _value), (T)(z / _value));
+		return Vector((T)(x / _value), (T)(y / _value), (T)(z / _value));
 	}
 
 	template<typename VT> requires std::is_arithmetic<VT>::value
-		Vector<T> operator+(const VT& _value) const
+		Vector operator+(const VT& _value) const
 	{
-		return Vector<T>((T)(x + _value), (T)(y + _value), (T)(z + _value));
+		return Vector((T)(x + _value), (T)(y + _value), (T)(z + _value));
 	}
 
-	Vector<T> operator+(const Vector<T>& _other) const
+	Vector operator+(const Vector& _other) const
 	{
-		return Vector<T>(x + _other.x, y + _other.y, z + _other.z);
+		return Vector(x + _other.x, y + _other.y, z + _other.z);
 	}
 
-	Vector<T> operator-(const Vector<T>& _other) const
+	Vector operator-(const Vector& _other) const
 	{
-		return Vector<T>(x - _other.x, y - _other.y, z - _other.z);
+		return Vector(x - _other.x, y - _other.y, z - _other.z);
 	}
 
-	float Magnitude() const
+	auto Magnitude() const
 	{
-		return (float)sqrt((x * x) + (y * y) + (z * z));
+		return sqrt((x * x) + (y * y) + (z * z));
 	}
 
-	double SqrtMagnitude() const
+	auto SqrtMagnitude() const
 	{
 		return ((x * x) + (y * y) + (z * z));
 	}
-	Vector<T> Normalize()
+	
+	Vector Normalize() const
 	{
-		double num = Magnitude();
+		auto num = Magnitude();
 		if (num > EPSILON)
 		{
 			return (*this) / num;
 		}
 
-		return Vector<T>();
+		return Vector();
 	}
 
-	static Vector<T> Lerp(const Vector<T>& _a, const Vector<T>& _b, const float& _delta)
+	auto Yaw() const
 	{
-		return Vector<T>(static_cast<T>(_a.x + (_b.x - _a.x) * _delta), static_cast<T>(_a.y + (_b.y - _a.y) * _delta), static_cast<T>(_a.z + (_b.z - _a.z) * _delta));
+		const auto yawRadians = std::atan2(z, x);
+		return yawRadians * (180.0f / PI);
 	}
 
-	inline bool IsZero() { return ((x + y + z) == 0); }
+	inline bool IsInvalid() const { return (MIN_VALUE > x || MIN_VALUE > y || MIN_VALUE > z); }
+
+	static Vector Lerp(const Vector& _a, const Vector& _b, const float& _delta)
+	{
+		return Vector(static_cast<T>(_a.x + (_b.x - _a.x) * _delta), static_cast<T>(_a.y + (_b.y - _a.y) * _delta), static_cast<T>(_a.z + (_b.z - _a.z) * _delta));
+	}
+
+	static Vector FromYaw(const float& _yaw, const float& _magnitude)
+	{
+		const auto yawRadians = _yaw * (PI / 180.0f);
+		return Vector(static_cast<T>(std::cos(yawRadians) * _magnitude), static_cast<T>(0), static_cast<T>(std::sin(yawRadians) * _magnitude));
+	}
+
+	static Vector Zero()
+	{
+		return Vector(static_cast<T>(0), static_cast<T>(0), static_cast<T>(0));
+	}
+
+	template<typename T_OTHER_VECTOR>
+	static auto ToVector(const T_OTHER_VECTOR& _otherVector)
+	{
+		if constexpr (requires(T_OTHER_VECTOR t) { t.x(); })
+		{
+			return Vector(_otherVector.x(), _otherVector.y(), _otherVector.z());
+		}
+		else
+		{
+			return Vector(_otherVector.x, _otherVector.y, _otherVector.z);
+		}
+	}
 };

@@ -21,6 +21,9 @@ public:
     Result SetAcceptedConfig(const std::string& _imnName, const AcceptedConfig& _handler);
     Result RequestConnect(const std::string& _imnName, const ConnectedConfig& _connectedConfig);
 
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
+
 private:
     std::unordered_map<std::string, ImnInfo> m_imnInfos;
 };

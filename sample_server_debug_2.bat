@@ -1,0 +1,1 @@
+.\x64\Debug\sample.exe .\config\sample_2.config

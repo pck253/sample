@@ -6,14 +6,16 @@ class Web : public Module
 {
     friend Module;
 public:
-    Web(const std::string& _configFilePath);
+    Web(Application& _application, const std::string& _configFilePath);
     ~Web();
 
     virtual bool IsBusinessModule() final { return false; }
     virtual EModule GetModuleType() final { return EModule::Web; }
 
+protected:
     virtual void Shutdown() final;
 
+public:
     Restful& GetRestful() { return m_restful; }
 
 private:

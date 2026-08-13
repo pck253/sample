@@ -448,14 +448,6 @@
     <ClCompile Include="$(ProjectDir)lib\vssh\libssh2.c" />
     <ClCompile Include="$(ProjectDir)lib\vssh\wolfssh.c" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="C:\Users\PCK\Downloads\curl-8.5.0\build\ZERO_CHECK.vcxproj">
-      <Project>{BC44963D-59B4-3C7F-AFC4-DD24089B821A}</Project>
-      <Name>ZERO_CHECK</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

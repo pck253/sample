@@ -51,7 +51,7 @@ public:
 
 	// this function for business module.
 	virtual void StopPublicListen(const std::string& _listenerName) = 0;
-	virtual void ClosePublicConnection(const std::string& _listenerName) = 0;
+	virtual bool IsEmptyPublicConnection(const std::string& _listenerName) const = 0;
 
 protected:
 	NetworkAccessor() = default;
@@ -59,7 +59,7 @@ protected:
 
 struct NetworkHelper
 {
-	Result SettingByConfig(const nlohmann::json& _config, Application* _application, const AcceptedConfig& _acceptedConfig, const ConnectedConfig& _connectedConfig)
+	Result SettingByConfig(const nlohmann::json& _config, Application& _application, const AcceptedConfig& _acceptedConfig, const ConnectedConfig& _connectedConfig)
 	{
 		auto networkConfig = _config["network config"];
 		if (networkConfig.is_null())
@@ -67,7 +67,7 @@ struct NetworkHelper
 			return EError::InvalidConfig;
 		}
 
-		auto networkModule = _application->GetModule(EModule::Network);
+		auto networkModule = _application.GetModule(EModule::Network);
 		if (!networkModule)
 		{
 			return EError::NotExistModule;
@@ -123,7 +123,7 @@ struct NetworkHelper
 		return EError::Success;
 	}
 
-	void ShutdownPublic(const nlohmann::json& _config, Application* _application)
+	void ShutdownPublic(const nlohmann::json& _config, Application& _application)
 	{
 		auto networkConfig = _config["network config"];
 		if (networkConfig.is_null())
@@ -131,7 +131,7 @@ struct NetworkHelper
 			return;
 		}
 
-		auto networkModule = _application->GetModule(EModule::Network);
+		auto networkModule = _application.GetModule(EModule::Network);
 		if (!networkModule)
 		{
 			return;
@@ -148,7 +148,43 @@ struct NetworkHelper
 		for (auto& listenerName : useListeners)
 		{
 			static_cast<NetworkAccessor*>(networkAccessor)->StopPublicListen(listenerName.get<std::string>());
-			static_cast<NetworkAccessor*>(networkAccessor)->ClosePublicConnection(listenerName.get<std::string>());
 		}
+	}
+
+	bool IsEmptyPublicConnection(const nlohmann::json& _config, Application& _application) const
+	{
+		auto networkConfig = _config["network config"];
+		if (networkConfig.is_null())
+		{
+			return true;
+		}
+
+		auto networkModule = _application.GetModule(EModule::Network);
+		if (!networkModule)
+		{
+			return true;
+		}
+		ModuleAccessor* networkAccessor = networkModule->GetAccessor();
+		if (!networkAccessor)
+		{
+			return true;
+		}
+
+		auto useListenersConfig = networkConfig["use listeners"];
+		if (!useListenersConfig.is_array())
+		{
+			return true;
+		}
+
+		auto useListeners = useListenersConfig.get<std::vector<nlohmann::json>>();
+		for (auto& listenerName : useListeners)
+		{
+			if (!networkAccessor->As<NetworkAccessor>().IsEmptyPublicConnection(listenerName.get<std::string>()))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 };

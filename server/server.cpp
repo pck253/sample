@@ -2,8 +2,8 @@
 
 MODULE_STATIC_IMPL(Server);
 
-Server::Server(const std::string& _configFilePath)
-	: Module(_configFilePath), m_threadPool("Server ThreadPool"), m_serverSessionManager(m_threadPool)
+Server::Server(Application& _application, const std::string& _configFilePath)
+	: Module(_application, _configFilePath), m_threadPool("Server ThreadPool"), m_serverSessionManager(m_threadPool)
 {
 }
 
@@ -21,11 +21,11 @@ static bool OnAcceptedConnection(const Result& _result, ConnectionShared_t _conn
 
 	if (!_conn->IsPublic())
 	{
-		Module::As<Server>()->ServerConnected(_conn);
+		Module::As<Server>().ServerConnected(_conn);
 	}
 	else
 	{
-		Module::As<Server>()->AddUserSession(_conn);
+		Module::As<Server>().AddUserSession(_conn);
 	}
 
 	return true;
@@ -39,7 +39,7 @@ static bool OnConnected(const Result& _result, const std::string& _connecterName
 		return false;
 	}
 
-	Module::As<Server>()->ServerConnected(_conn);
+	Module::As<Server>().ServerConnected(_conn);
 
 	return true;
 }
@@ -48,7 +48,7 @@ static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t
 {
 	if (_conn->IsPublic())
 	{
-		auto const user = Module::As<Server>()->FindUserSession(_conn->GetConnectionId());
+		auto const user = Module::As<Server>().FindUserSession(_conn->GetConnectionId());
 		if (not user)
 		{
 			LogError("not exist user");
@@ -62,7 +62,7 @@ static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t
 	}
 	else
 	{
-		auto const server = Module::As<Server>()->GetServerSessionManager().FindSession(_conn->GetConnectionId());
+		auto const server = Module::As<Server>().GetServerSessionManager().FindSession(_conn->GetConnectionId());
 		if (not server)
 		{
 			LogError("not exist server");
@@ -84,7 +84,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 		{
 			LogWarning("Closed User Session : {}", _result.message);
 		}
-		Module::As<Server>()->ClosedUserSession(_result, _connectionId);
+		Module::As<Server>().ClosedUserSession(_result, _connectionId);
 	}
 	else
 	{
@@ -93,7 +93,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 			LogWarning("Closed Server Session : {}", _result.message);
 		}
 
-		auto session = Module::As<Server>()->GetServerSessionManager().RemoveSession(_connectionId);
+		auto session = Module::As<Server>().GetServerSessionManager().RemoveSession(_connectionId);
 		if (session)
 		{
 			session->Closed();
@@ -103,7 +103,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 
 static bool OnRestfulRequest(const RestufulRequestId_t& _requestId, const std::wstring& _path, const std::wstring& _query, WebAccessor* _accessor)
 {
-	Module::As<Server>()->CallRestfulHandler(_requestId, _path, _query, _accessor);
+	Module::As<Server>().CallRestfulHandler(_requestId, _path, _query, _accessor);
 	return true;
 }
 
@@ -163,7 +163,7 @@ Result Server::InitImpl()
 	}
 
 	// timer
-	auto timerModule = GetApplication()->GetModule(EModule::Timer);
+	auto timerModule = GetApplication().GetModule(EModule::Timer);
 	if (!timerModule)
 	{
 		return EError::NotExistModule;
@@ -183,7 +183,7 @@ void Server::InitRestfulHandlers()
 					_otherServer.Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
 				});
 
-			GetApplication()->Shutdown();
+			GetApplication().Shutdown();
 			return nlohmann::json({ {"message", "done"} });
 		});
 }
@@ -217,11 +217,33 @@ void Server::Shutdown()
 	NetworkHelper networkHelper;
 	networkHelper.ShutdownPublic(m_config, GetApplication());
 
+	m_shutdownCoordinator.Push("server public connections closed", [this, networkHelper]()
+		{
+			return networkHelper.IsEmptyPublicConnection(m_config, GetApplication()) ? ShutdownCoordinator::EStepResult::Done : ShutdownCoordinator::EStepResult::Wait;
+		});
+
+	m_shutdownCoordinator.Push("server close server sessions", [this]()
+		{
+			m_serverSessionManager.Travel([](ServerSession& _session)
+				{
+					_session.Close(EError::Shutdown);
+				});
+
+			return ShutdownCoordinator::EStepResult::Done;
+		});
+
+	m_shutdownCoordinator.Push("server server sessions closed", [this]()
+		{
+			return m_serverSessionManager.IsEmpty() ? ShutdownCoordinator::EStepResult::Done : ShutdownCoordinator::EStepResult::Wait;
+		});
+
 	if (m_timerJobManager)
 	{
-		m_timerJobManager->Shutdown("timer job manager counter.");
+		m_timerJobManager->Shutdown(m_shutdownCoordinator, "timer job manager counter.");
 	}
-	m_threadPool.Shutdown("thread pool shutdown.");
+	m_threadPool.Shutdown(m_shutdownCoordinator, "thread pool shutdown.");
+
+	m_shutdownCoordinator.Run();
 
 	UserSession::UninitPacketHandlers();
 	ServerSession::UninitPacketHandlers();
@@ -267,7 +289,7 @@ void Server::ClosedUserSession(const Result& _result, const ConnectionId_t& _con
 
 ServerSessionShared_t Server::ServerConnected(ConnectionShared_t _conn)
 {
-	auto server = Module::As<Server>()->GetServerSessionManager().CreateSession(_conn);
+	auto server = Module::As<Server>().GetServerSessionManager().CreateSession(_conn);
 
 	server->SendActivation(GetModuleType(), GetServerId(), GetServerGroupId());
 

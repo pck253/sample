@@ -1,6 +1,6 @@
 #pragma once
 
-using TimerJobId_t = StrongId<uint64_t, 0ui64>;
+DEFINE_STRONG_ID(TimerJobId_t, uint64_t, 0ui64);
 
 struct TimerJobAccessor
 {
@@ -36,7 +36,7 @@ public:
 
 	auto Get() { return shared_from_this(); }
 
-	virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) = 0;
+	virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const SteadyTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) = 0;
 	virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) = 0;
 
 protected:

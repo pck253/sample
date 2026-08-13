@@ -1,13 +1,10 @@
-﻿#pragma once
-
-#define ALIGNMENT 8
-#define POOL_COUNT (64 * 1024 / ALIGNMENT)	// 8B ~ 64KB
-#define ADJUST_SIZE(s) ((s % ALIGNMENT != 0) ? (((s / ALIGNMENT) + 1) * ALIGNMENT) : s)
-#define MAKE_POOL_INDEX(ajs) ((ajs / ALIGNMENT) - 1)
+#pragma once
 
 class MemoryPool final
 {
 public:
+	inline static constexpr std::size_t ALIGNMENT{ 8 };
+
 	MemoryPool()
 	{
 
@@ -51,8 +48,8 @@ public:
 		uint8_t* ptr{};
 		if (0 < _size)
 		{
-			const auto adjustSize{ ADJUST_SIZE(_size) };
-			const auto index{ MAKE_POOL_INDEX(adjustSize) };
+			const auto adjustSize{ AdjustSize(_size) };
+			const auto index{ MakePoolIndex(adjustSize) };
 			if (index < POOL_COUNT)
 			{
 				if (!m_pools[index].try_pop(ptr))
@@ -73,8 +70,8 @@ public:
 	{
 		if (_ptr && 0 < _size)
 		{
-			const auto adjustSize{ ADJUST_SIZE(_size) };
-			const auto index{ MAKE_POOL_INDEX(adjustSize) };
+			const auto adjustSize{ AdjustSize(_size) };
+			const auto index{ MakePoolIndex(adjustSize) };
 			if (index < POOL_COUNT)
 			{
 				m_pools[index].push(_ptr);
@@ -88,7 +85,12 @@ public:
 	}
 
 private:
+	inline static constexpr std::size_t POOL_COUNT{ 64 * 1024 / ALIGNMENT }; // 8B ~ 64KB
+
+	static auto AdjustSize(const std::size_t _s) { return (_s % ALIGNMENT != 0) ? (((_s / ALIGNMENT) + 1) * ALIGNMENT) : _s; }
+	static auto MakePoolIndex(const std::size_t _adjustedSize) { return (_adjustedSize / ALIGNMENT) - 1; }
+
 	Concurrency::concurrent_queue<uint8_t*> m_pools[POOL_COUNT];	// 8B ~ 64KB
 };
 
-extern MemoryPool* g_memoryPool;
+inline MemoryPool* g_memoryPool = nullptr;

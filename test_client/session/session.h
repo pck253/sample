@@ -29,5 +29,5 @@ private:
     // --------------------
     uint64_t m_receivedCount = 0;
     uint64_t m_receivedByte = 0;
-    TickTime_t m_latestReceived;
+    SteadyTime_t m_latestReceived;
 };

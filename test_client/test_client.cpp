@@ -2,8 +2,8 @@
 
 MODULE_STATIC_IMPL(TestClient);
 
-TestClient::TestClient(const std::string& _configFilePath)
-	: Module(_configFilePath), m_threadPool("TestClient ThreadPool")
+TestClient::TestClient(Application& _application, const std::string& _configFilePath)
+	: Module(_application, _configFilePath), m_threadPool("TestClient ThreadPool")
 {
 }
 
@@ -19,14 +19,14 @@ static bool OnConnected(const Result& _result, const std::string& _connecterName
 		return false;
 	}
 
-	Module::As<TestClient>()->Connected(_conn);
+	Module::As<TestClient>().Connected(_conn);
 
 	return true;
 }
 
 static void OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t& _conn)
 {
-	auto const session = Module::As<TestClient>()->GetSession();
+	auto const session = Module::As<TestClient>().GetSession();
 	if (not session)
 	{
 		LogError("not exist session");
@@ -44,7 +44,7 @@ static void OnClosed(const Result& _result, const ConnectionId_t _connectionId, 
 	{
 		LogWarning("Closed Session : {}", _result.message);
 	}
-	Module::As<TestClient>()->ApplicationShutdown(_result);
+	Module::As<TestClient>().ApplicationShutdown(_result);
 }
 
 Result TestClient::InitImpl()
@@ -65,7 +65,7 @@ Result TestClient::InitImpl()
 	m_threadPool.Init(threadCount);
 
 	// timer
-	auto timerModule = GetApplication()->GetModule(EModule::Timer);
+	auto timerModule = GetApplication().GetModule(EModule::Timer);
 	if (!timerModule)
 	{
 		return EError::NotExistModule;
@@ -90,11 +90,18 @@ void TestClient::Shutdown()
 	NetworkHelper networkHelper;
 	networkHelper.ShutdownPublic(m_config, GetApplication());
 
+	m_shutdownCoordinator.Push("test_client public connections closed", [this, networkHelper]()
+		{
+			return networkHelper.IsEmptyPublicConnection(m_config, GetApplication()) ? ShutdownCoordinator::EStepResult::Done : ShutdownCoordinator::EStepResult::Wait;
+		});
+
 	if (m_timerJobManager)
 	{
-		m_timerJobManager->Shutdown("test_client timer job manager shutdown.");
+		m_timerJobManager->Shutdown(m_shutdownCoordinator, "test_client timer job manager shutdown.");
 	}
-	m_threadPool.Shutdown("client thread pool shutdown.");
+	m_threadPool.Shutdown(m_shutdownCoordinator, "client thread pool shutdown.");
+
+	m_shutdownCoordinator.Run();
 
 	Session::UninitPacketHandlers();
 
@@ -109,7 +116,7 @@ void TestClient::ApplicationShutdown(const Result& _result)
 		m_session.reset();
 	}
 
-	GetApplication()->Shutdown();
+	GetApplication().Shutdown();
 }
 
 // ------------------------------------------------------------------------------------------
@@ -203,7 +210,7 @@ void TestSendFunc(uint64_t sendIndex, SessionShared_t _session)
 			TestSendFunc(sendIndex, _session);
 		});
 
-	Module::As<TestClient>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 16);
+	Module::As<TestClient>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 16);
 }
 // ------------------------------------------------------------------------------------------
 

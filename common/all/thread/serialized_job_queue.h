@@ -1,6 +1,8 @@
 #pragma once
 
-class SerializedJobQueue : public std::enable_shared_from_this<SerializedJobQueue>, public UseShutdown
+inline thread_local SerializedJobQueue* g_currentSerializedJobQueue = nullptr;
+
+class SerializedJobQueue : public std::enable_shared_from_this<SerializedJobQueue>
 {
 public:
     class IJobWrapper : public MemPoolInstance
@@ -29,7 +31,6 @@ public:
             {
                 //using Target_t = typename ExtractSharedPtrInner<std::tuple_element_t<0, ArgTypes_t>>::Type;
                 using Target_t = std::tuple_element_t<0, ArgTypes_t>;
-
                 if constexpr (std::is_same_v<Target_t, SerializedJobQueue>)
                 {
                     m_job(*_jobQueue.get());
@@ -40,12 +41,12 @@ public:
                 }
                 else
                 {
-                    static_assert(false);
+                    static_assert(0 == sizeof(T_FUNC));
                 }
             }
             else
             {
-                static_assert(false);
+                static_assert(0 == sizeof(T_FUNC));
             }
         }
     private:
@@ -62,11 +63,15 @@ public:
 
     virtual ~SerializedJobQueue()
     {
-        assert(IsShutdown());
-
         if (!m_isFromCreateFunc)
         {
             LogWarning("this was not created from \"Create\" function.");
+        }
+
+        if (!m_pushStopped.load(std::memory_order_acquire))
+        {
+            LogError("destroyed. push is not stopped.");
+            assert(m_pushStopped.load(std::memory_order_acquire));
         }
 
         IJobWrapper* job{};
@@ -76,7 +81,22 @@ public:
         }
     }
 
-    auto& GetThreadPool() { return m_threadPoolRef; }
+    void StopPush(const char* _msg = nullptr)
+    {
+        bool expected = false;
+        if (!m_pushStopped.compare_exchange_strong(expected, true))
+        {
+            LogWarning("StopPush is ignored. already stopped : {}", _msg ? _msg : "no message");
+            return;
+        }
+
+        if (_msg)
+        {
+            Log("StopPush : {}", _msg);
+        }
+    }
+
+    inline bool IsPushStopped() const { return m_pushStopped.load(); }
 
     template<class T = SerializedJobQueue> requires std::derived_from<T, SerializedJobQueue>
     std::shared_ptr<T> Get()
@@ -100,17 +120,22 @@ public:
         return dynamic_cast<T&>(*this);
     }
 
-    void SetOnEmptyJob(std::function<void()>&& _onEmptyJob) { m_onEmptyJob = std::move(_onEmptyJob); }
-
     template<typename T_FUNC>
     void PushJob(T_FUNC&& _job)
     {
-        // possible call PushJob after Shutdown.
+        static_assert(!std::is_lvalue_reference_v<T_FUNC>, "PushJob only accepts rvalue callables");
+
+        if (IsPushStopped())
+        {
+            return;
+        }
+
+        // possible call PushJob after StopPush.
         // but, delete remain job in destructor.
         m_jobQueue.push(new JobWrapper(std::move(_job)));
 
-        auto old = m_jobCount.fetch_add(1);
-        if (old == 0)
+        const auto old = m_jobCount.fetch_add(1);
+        if (0 == old)
         {
             m_threadPoolRef.PushJob([_self = Get()]()
             {
@@ -119,28 +144,9 @@ public:
         }
     }
 
-    void PushJob(IJobWrapper* _job)
-    {
-        if (nullptr == _job)
-        {
-            return;
-        }
-        // possible call PushJob after Shutdown.
-        // but, delete remain job in destructor.
-        m_jobQueue.push(_job);
-
-        auto old = m_jobCount.fetch_add(1);
-        if (old == 0)
-        {
-            m_threadPoolRef.PushJob([_self = Get()]()
-                {
-                    _self->ProcessJob();
-                });
-        }
-    }
-
     void ProcessJob()
     {
+        g_currentSerializedJobQueue = this;
         const auto count{ m_jobCount.load() };
         auto self{ Get() };
 
@@ -153,31 +159,30 @@ public:
                 continue;
             }
             ++processed;
+
             (*job)(self);
             delete job;
         }
         const auto old{ m_jobCount.fetch_add(-processed) };
 
-        if (old != count)   // if old is count, current is 0.
+        if (old != count)   // if old is equal count, current job count is 0 after fetach_add
         {
             m_threadPoolRef.PushJob([jobQueue = std::move(self)]()
                 {
                     jobQueue->ProcessJob();
                 });
-            return;
         }
-        if (m_onEmptyJob)
-        {
-            m_onEmptyJob();
-        }
+        g_currentSerializedJobQueue = nullptr;
     }
 
 protected:
     explicit SerializedJobQueue(ThreadPool& _threadPool) : m_threadPoolRef(_threadPool) {}
 
-    bool m_isFromCreateFunc{};
+    bool CheckInProcess() const { return (this == g_currentSerializedJobQueue); }
 
-    std::function<void()> m_onEmptyJob;
+protected:
+    bool m_isFromCreateFunc{};
+    std::atomic_bool m_pushStopped{ false };
 
     ThreadPool& m_threadPoolRef;
 

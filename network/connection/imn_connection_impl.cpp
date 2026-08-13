@@ -9,12 +9,10 @@ ImnJobQueue::ImnJobQueue(ThreadPool& _threadPool, const ConnectionShared_t& _con
 
 //-----------------------------------------------------------------------------
 
-ImnConnectionImpl::ImnConnectionImpl(const ConnectionId_t _connectionId, ConnectionManager& _connectionManager,
-    const ReceivedHandler_t _receivedHandler, const ClosedHandler_t _closedHandler)
+ImnConnectionImpl::ImnConnectionImpl(const ConnectionId_t _connectionId, ConnectionManager& _connectionManager, const ReceivedHandler_t _receivedHandler)
     : Connection(_connectionId, false),
     m_connectionManager(_connectionManager),
-    m_receivedHandler(_receivedHandler),
-    m_closedHandler(_closedHandler)
+    m_receivedHandler(_receivedHandler)
 {
 }
 
@@ -27,7 +25,6 @@ void ImnConnectionImpl::InitJobQueue(ThreadPool& _threadPool)
 {
     const auto self = Get();
     m_jobQueue = ImnJobQueue::Create<ImnJobQueue>(_threadPool, self);
-    m_receivedJobQueue = ImnJobQueue::Create<ImnJobQueue>(_threadPool, self);
 }
 
 Result ImnConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _serializedData, const PacketDeallocatorShared_t& _deallocator)
@@ -45,8 +42,7 @@ Result ImnConnectionImpl::Send(const PacketSize_t& _size, const uint8_t* _serial
             const auto size = sendRawData.size();
 
             Result ret;
-            auto& targetConnection = GetTargetConnection();
-            if (targetConnection)
+            if (auto const& targetConnection = GetTargetConnection())
             {
                 ImnConnectionImpl* tConn = static_cast<ImnConnectionImpl*>(targetConnection.get());
                 ret = tConn->Receive(std::move(sendRawData));
@@ -74,34 +70,26 @@ Result ImnConnectionImpl::Close(const Result& _reason)
         return EError::ClosedSocket;
     }
 
-    m_receivedJobQueue->Shutdown("imn received job queue shutdown.");
-    m_receivedJobQueue.reset();
-
     m_jobQueue->PushJob([_reason, this](SerializedJobQueue& _jobQueue)
         {
+            m_receivedHandler = {};
+
             auto& targetConnection = GetTargetConnection();
             if (targetConnection)
             {
                 targetConnection->Close(_reason);
                 targetConnection.reset();
             }
-        });
-    m_jobQueue->Shutdown("imn job queue shutdown.");
 
-    if (m_closedHandler)
-    {
-        m_closedHandler(_reason, GetConnectionId(), m_isPublic);
-        m_closedHandler = nullptr;
-    }
+            auto& imnJobQueue = _jobQueue.As<ImnJobQueue>();
+            imnJobQueue.ReleaseConnection();
 
-    // Asynchronously call reason
-    //   - m_connectionManager is call connection instance's member function : flow is top-down => ok
-    //   - connection instance is call connection m_connectionManager 's member function : flow is down-top => possible dead lock
-    m_jobQueue->GetThreadPool().PushJob([connectionManager = &m_connectionManager, conId = GetConnectionId(), isPublic = m_isPublic]()
-        {
-            connectionManager->OnClosed(conId, isPublic);
+            // Asynchronously call reason
+            //   - m_connectionManager is call connection instance's member function : flow is top-down => ok
+            //   - connection instance is call connection m_connectionManager 's member function : flow is down-top => possible dead lock
+            m_connectionManager.OnClosed(_reason, GetConnectionId(), m_isPublic);
         });
-    m_jobQueue.reset();
+    m_jobQueue->StopPush("imn job queue shutdown.");
 
     return EError::Success;
 }
@@ -113,24 +101,14 @@ Result ImnConnectionImpl::Receive(std::vector<uint8_t>&& _rawData)
         return EError::ClosedSocket;
     }
 
-    m_receivedJobQueue->PushJob([this, receivedRawData = std::move(_rawData)](ImnJobQueue& _jobQueue) mutable
+    m_jobQueue->PushJob([this, recvRawData = std::move(_rawData)](SerializedJobQueue& _jobQueue) mutable
         {
-            OnReceived(std::move(receivedRawData), _jobQueue.GetConnection());
+            if (m_receivedHandler)
+            {
+                const auto& imnJobQueue = _jobQueue.As<ImnJobQueue>();
+                m_receivedHandler(std::move(recvRawData), imnJobQueue.GetConnection());
+            }
         });
 
     return EError::Success;
-}
-
-void ImnConnectionImpl::OnReceived(std::vector<uint8_t>&& _rawData, const ConnectionShared_t& _self)
-{
-    if (m_isClosed)
-    {
-        m_receivedHandler = nullptr;
-        return;
-    }
-
-    if (m_receivedHandler)
-    {
-        m_receivedHandler(std::move(_rawData), _self);
-    }
 }

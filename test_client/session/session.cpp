@@ -3,7 +3,7 @@
 Session::Session(ThreadPool& _threadPool, ConnectionShared_t _conn)
 	: Super_t(_threadPool), m_connection(_conn)
 {
-	m_latestReceived = GET_TICK();
+	m_latestReceived = GetSteadyTime();
 }
 
 Session::~Session()
@@ -24,7 +24,7 @@ void Session::Close(const Result& _reason)
 
 void Session::Closed(const Result& _result)
 {
-	Shutdown("test_client session shutdown.");
+	StopPush("test_client session shutdown.");
 }
 
 void Session::InitPacketHandlers()
@@ -37,7 +37,7 @@ void Session::UninitPacketHandlers()
 {
 	for (auto& [protocol, handler] : m_packetHandlerCallers)
 	{
-		SAFE_DELETE(handler);
+		SafeDelete(handler);
 	}
 	m_packetHandlerCallers.clear();
 }
@@ -61,7 +61,7 @@ void Session::ReceivedStatics(const PacketSize_t& _receivedSize)
 {
 	++m_receivedCount;
 	m_receivedByte += _receivedSize;
-	auto now = GET_TICK();
+	auto now = GetSteadyTime();
 	if (now - m_latestReceived >= 5000)
 	{
 		printf_s("%llu received.\n", m_receivedByte);

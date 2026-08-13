@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace StringUtility
 {
@@ -9,25 +9,25 @@ namespace StringUtility
 		{
 			char ch = _src[i];
 
-			if ((ch & 0x80) == 0)
+			if (0 == (ch & 0x80))
 			{
 				wChar = ch;
 				++i;
 			}
-			else if ((ch & 0xE0) == 0xC0)
+			else if (0xC0 == (ch & 0xE0))
 			{
 				wChar = (_src[i] & 0x1F) << 6;
 				wChar |= (_src[i + 1] & 0x3F);
 				i += 2;
 			}
-			else if ((ch & 0xF0) == 0xE0)
+			else if (0xE0 == (ch & 0xF0))
 			{
 				wChar = (_src[i] & 0xF) << 12;
 				wChar |= (_src[i + 1] & 0x3F) << 6;
 				wChar |= (_src[i + 2] & 0x3F);
 				i += 3;
 			}
-			else if ((ch & 0xF8) == 0xF0)
+			else if (0xF0 == (ch & 0xF8))
 			{
 				wChar = (_src[i] & 0x7) << 18;
 				wChar |= (_src[i + 1] & 0x3F) << 12;
@@ -99,6 +99,6 @@ namespace StringUtility
 			std::string temp(token.data(), token.size());
 			tokens.emplace_back(std::move(temp));
 		}
-		return std::move(tokens);
+		return tokens;
 	}
 };

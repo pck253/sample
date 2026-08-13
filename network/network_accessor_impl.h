@@ -17,7 +17,7 @@ public:
 	virtual Result RequestConnect(const std::string& _connecterName, const ConnectedConfig& _connectedConfig, const uint16_t& _tryReconnectCount) final;
 
 	virtual void StopPublicListen(const std::string& _listenerName) final;
-	virtual void ClosePublicConnection(const std::string& _listenerName) final;
+	virtual bool IsEmptyPublicConnection(const std::string& _listenerName) const final;
 
 private:
 	NetworkAccessorImpl(Network* _networkModule) : m_networkModule(*_networkModule) {};

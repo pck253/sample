@@ -109,7 +109,7 @@ protected:
 	{
 		for (auto& [protocol, handler] : m_commonPacketHandlerCallers)
 		{
-			SAFE_DELETE(handler);
+			SafeDelete(handler);
 		}
 		m_commonPacketHandlerCallers.clear();
 	}
@@ -305,6 +305,12 @@ public:
 		return true;
 	}
 
+	bool IsEmpty() const
+	{
+		SCOPED_READ_LOCK(m_mutex);
+		return m_sessions.empty();
+	}
+
 	void Travel(std::function<void(T&)>&& _travelFunc)
 	{
 		SCOPED_READ_LOCK(m_mutex);
@@ -319,7 +325,7 @@ private:
 	// server session connection or disconnection is not frequent.
 	// so, mutex is used almost exclusively for read lock.
 	// -------------------------------------------------------------------------
-	std::shared_mutex m_mutex;
+	mutable std::shared_mutex m_mutex;
 
 	ThreadPool& m_threadPoolRef;
 

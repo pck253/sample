@@ -2,9 +2,9 @@
 
 static_assert(NETWORK_MODULE == 1);
 
-#define BUFFER_INFO_INDEX 0
-#define BUFFER_ADDR_INDEX 1
-#define BUFFER_SIZE_INDEX 2
+static constexpr size_t BUFFER_INFO_INDEX{ 0 };
+static constexpr size_t BUFFER_ADDR_INDEX{ 1 };
+static constexpr size_t BUFFER_SIZE_INDEX{ 2 };
 struct SendBufferInfo
 {
 	uint8_t* buffer = nullptr;
@@ -18,7 +18,7 @@ struct SendBufferInfo
 	}
 	bool IsNotUse()
 	{
-		return (readableSize == 0);
+		return (0 == readableSize);
 	}
 };
 using ReservedSendData_t = std::list<std::tuple<SendBufferInfo*, uint8_t*, size_t>>;

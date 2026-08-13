@@ -21,7 +21,7 @@ void ServerSession::UninitPacketHandlers()
 {
 	for (auto& [protocol, handler] : m_serverPacketHandlerCallers)
 	{
-		SAFE_DELETE(handler);
+		SafeDelete(handler);
 	}
 	m_serverPacketHandlerCallers.clear();
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 struct CheatCommandParams
 {
@@ -6,11 +6,11 @@ struct CheatCommandParams
 	std::vector<int64_t> numericParams;
 };
 
-template<class T>
+template<class T_SESSION, typename T_PARAMS> requires std::derived_from<T_PARAMS, CheatCommandParams>
 class CheatCommandProcessor
 {
 public:
-	using Handler = std::function<Result(T&, CheatCommandParams&)>;
+	using Handler = std::function<Result(T_SESSION&, T_PARAMS&)>;
 
 	CheatCommandProcessor()
 	{
@@ -28,7 +28,7 @@ public:
 		return ret.second;
 	}
 
-	Result Process(T& _session, const std::string& _command, CheatCommandParams& _params)
+	Result Process(T_SESSION& _session, const std::string& _command, T_PARAMS& _params) const
 	{
 		auto found = m_handlers.find(_command);
 		if (found == m_handlers.end())
@@ -41,7 +41,7 @@ public:
 		{
 			result.message = found->second.explain;
 		}
-		return std::move(result);
+		return result;
 	}
 
 protected:

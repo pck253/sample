@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 template<typename T>
 concept HasIterator = requires
@@ -69,7 +69,7 @@ struct FunctionTraits
 };
 // FunctionTraits
 
-// ExtractSharedPtrInner
+//ExtractSharedPtrInner
 template<typename T>
 struct ExtractSharedPtrInner;
 
@@ -90,4 +90,4 @@ struct ExtractSharedPtrInner<std::shared_ptr<T>&&>
 {
     using Type = T;
 };
-// ExtractSharedPtrInner
+//ExtractSharedPtrInner

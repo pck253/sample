@@ -5,34 +5,104 @@ static_assert(WEB_MODULE == 1);
 Restful::Restful(Web& _webModule)
 	: m_webModule(_webModule)
 {
-	m_afterShutdown = [this]()
-		{
-			{
-				SCOPED_WRITE_LOCK(m_restfulRequestMutex);
-				for (auto& [requestId, request] : m_waitRestfulRequests)
-				{
-					request.reply(status_codes::OK, L"processing shutdown");
-				}
-				m_waitRestfulRequests.clear();
-			}
-
-			for (auto& [name, listenerInfo] : m_restfulListeners)
-			{
-				if (listenerInfo.nowUsing)
-				{
-					listenerInfo.nowUsing = false;
-					listenerInfo.listener->close()
-						.then([_name = name]() { Log("Closed Restful - {}", _name); })
-						.wait();
-				}
-
-				SAFE_DELETE(listenerInfo.listener);
-			}
-		};
 }
 
 Restful::~Restful()
 {
+}
+
+void Restful::RegisterShutdownSteps(ShutdownCoordinator& _coordinator)
+{
+	_coordinator.Push("restful in flight requests",
+		[this]()
+		{
+			return (0 < m_inFlightRequests.load()) ? EStepResult::Wait : EStepResult::Done;
+		},
+		[this]() { return std::format("remain={}", m_inFlightRequests.load()); });
+
+	_coordinator.Push("restful reply waiting requests", [this]()
+		{
+			decltype(m_waitRestfulRequests) waitRequests;
+			{
+				SCOPED_WRITE_LOCK(m_restfulRequestMutex);
+				waitRequests = std::move(m_waitRestfulRequests);
+			}
+
+			for (auto& [requestId, request] : waitRequests)
+			{
+				try {
+					request.reply(status_codes::OK, L"processing shutdown");
+				}
+				catch (const std::exception& e) {
+					LogError("Restful failed to reply on shutdown - {} : {}", requestId, e.what());
+				}
+			}
+
+			return EStepResult::Done;
+		});
+
+	_coordinator.Push("restful listener close", [this]()
+		{
+			// check opening stage after setted shutdown state
+			// SetRestfulHandler : reverse order
+			auto result = EStepResult::Done;
+			for (auto& [name, listenerInfo] : m_restfulListeners)
+			{
+				const auto state = listenerInfo.state.load();
+				if (EListenerState::Opening == state)
+				{
+					result = EStepResult::Wait;
+					continue;
+				}
+
+				if (EListenerState::Opened != state)
+				{
+					continue;
+				}
+				listenerInfo.state.store(EListenerState::Closed);
+
+				try {
+					m_closingListeners.emplace_back(name, listenerInfo.listener->close());
+				}
+				catch (const std::exception& e) {
+					LogError("Restful failed to close - {} : {}", name, e.what());
+				}
+			}
+
+			return result;
+		});
+
+	_coordinator.Push("restful listener close wait", [this]()
+		{
+			for (auto& closing : m_closingListeners)
+			{
+				if (!closing.second.is_done())
+				{
+					return EStepResult::Wait;
+				}
+			}
+
+			for (auto& [name, closeTask] : m_closingListeners)
+			{
+				try {
+					closeTask.wait();
+					Log("Closed Restful - {}", name);
+				}
+				catch (const std::exception& e) {
+					LogError("Restful failed to wait close - {} : {}", name, e.what());
+				}
+			}
+			m_closingListeners.clear();
+
+			return EStepResult::Done;
+		});
+
+	_coordinator.Push("restful in flight requests after close",
+		[this]()
+		{
+			return (0 < m_inFlightRequests.load()) ? EStepResult::Wait : EStepResult::Done;
+		},
+		[this]() { return std::format("remain={}", m_inFlightRequests.load()); });
 }
 
 Result Restful::Init(const nlohmann::json& _config)
@@ -66,52 +136,63 @@ Result Restful::Init(const nlohmann::json& _config)
 		http_listener_config listenConfig;
 		listenConfig.set_timeout(utility::seconds(timout));
 
-		http_listener* listener = nullptr;
+		std::unique_ptr<http_listener> listener;
 		try {
-			listener = new http_listener(builder.to_uri(), listenConfig);
+			listener = std::make_unique<http_listener>(builder.to_uri(), listenConfig);
 		}
 		catch (const std::exception& e) {
 			LogError("Restful error exception : {}", e.what());
 			return EError::RestfulException;
 		}
 
-		m_restfulListeners.emplace(name, RestfulListenerInfo(listener));
+		m_restfulListeners.try_emplace(name, std::move(listener));
 	}
+
+	m_initialized.store(true, std::memory_order_release);
 
 	return Result();
 }
 
 Result Restful::SetRestfulHandler(const std::string& _listenerName, const RestfulHandler_t _handler)
 {
+	if (!m_initialized.load(std::memory_order_acquire))
+	{
+		return EError::NotInitializedRestful;
+	}
+
 	const auto found = m_restfulListeners.find(_listenerName);
 	if (m_restfulListeners.end() == found)
 	{
 		return EError::NotExistRestfulListener;
 	}
 
-	bool expect = false;
-	if (!found->second.nowUsing.compare_exchange_strong(expect, true))
+	// check shutdown state after set opening stage
+	// shutdown step : reverse order
+	auto expect = EListenerState::None;
+	if (!found->second.state.compare_exchange_strong(expect, EListenerState::Opening))
 	{
 		return EError::AlreadyUsingRestfulListener;
 	}
 
+	if (IsShutdownStarted())
+	{
+		found->second.state.store(EListenerState::Closed);
+		return EError::Shutdown;
+	}
+
 	found->second.listener->support(methods::GET,
-		[this, &listenerRef = found->second, _handler](http_request _req)
+		[this, _handler](http_request _req)
 		{
-			if (IsShutdown())
+			m_inFlightRequests.fetch_add(1);
+			if (IsShutdownStarted())
 			{
+				m_inFlightRequests.fetch_sub(1);
 				_req.reply(status_codes::NotFound, "shutdown.");
 				return;
 			}
 
 			auto path = _req.request_uri().path();
 			auto query = web::uri::decode(_req.request_uri().query());
-
-			if (not listenerRef.nowUsing.load())
-			{
-				_req.reply(status_codes::NotFound, "not work.");
-				return;
-			}
 
 			auto requestId = ++m_restfulReqIdSequence;
 
@@ -121,13 +202,18 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 			}
 
 			(*_handler)(requestId, path, query, static_cast<WebAccessor*>(m_webModule.GetAccessor()));
+
+			m_inFlightRequests.fetch_sub(1);
 		});
 
 	found->second.listener->support(methods::OPTIONS,
 		[this](http_request _req)
 		{
-			if (IsShutdown())
+			m_inFlightRequests.fetch_add(1);
+			if (IsShutdownStarted())
 			{
+				m_inFlightRequests.fetch_sub(1);
+
 				http_response response(status_codes::ServiceUnavailable);
 				_req.reply(response);
 				return;
@@ -139,9 +225,11 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 			response.headers().add(U("Access-Control-Allow-Headers"), U("Content-Type"));
 
 			_req.reply(response);
+
+			m_inFlightRequests.fetch_sub(1);
 		});
 	//found->second.listener->support(methods::POST,
-	//	[this, &listenerRef = found->second, _handler](http_request _req)
+	//	[this, _handler](http_request _req)
 	// {
 	//		auto path = _req.request_uri().path();
 	//		auto query = web::uri::decode(_req.request_uri().query());
@@ -155,12 +243,6 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 	//		catch (const std::exception& e) {
 	//			LogError("Rest error exception : {}", e.what());
 	//			_req.reply(status_codes::OK, L"invalid request");
-	//			return;
-	//		}
-
-	//		if (not listenerRef.nowUsing.load())
-	//		{
-	//			_req.reply(status_codes::NotFound, "not work.");
 	//			return;
 	//		}
 
@@ -178,13 +260,16 @@ Result Restful::SetRestfulHandler(const std::string& _listenerName, const Restfu
 	StringUtility::UnicodeToUtf8(found->second.listener->uri().to_string(), uriString);
 	try {
 		found->second.listener->open()
-			.then([_name = found->first, &uriString]() { Log("Started Restful - {}({})", _name, uriString.c_str()); })
+			.then([name = found->first, uriString]() { Log("Started Restful - {}({})", name, uriString.c_str()); })
 			.wait();
 	}
 	catch (const std::exception& e) {
 		LogError("Rest error exception : {}", e.what());
+		found->second.state.store(EListenerState::None);
 		return EError::RestfulException;
 	}
+
+	found->second.state.store(EListenerState::Opened);
 
 	return EError::Success;
 }
@@ -203,14 +288,21 @@ void Restful::Response(const RestufulRequestId_t& _requestId, nlohmann::json&& _
 		m_waitRestfulRequests.erase(found);
 	}
 
+	// reply throws when the request is already gone. the listener timeout can take it away
+	// while the business logic is still working on the response.
 	utility::string_t jsonString;
-	if (StringUtility::Utf8ToUnicode(_reply.dump(), jsonString))
-	{
-		json::value jsonReply(jsonString);
-		req.reply(status_codes::OK, jsonReply);
+	try {
+		if (StringUtility::Utf8ToUnicode(_reply.dump(), jsonString))
+		{
+			json::value jsonReply(jsonString);
+			req.reply(status_codes::OK, jsonReply);
+		}
+		else
+		{
+			req.reply(status_codes::OK, "failed to make reply.");
+		}
 	}
-	else
-	{
-		req.reply(status_codes::OK, "failed to make reply.");
+	catch (const std::exception& e) {
+		LogError("Restful failed to reply - {} : {}", _requestId, e.what());
 	}
 }

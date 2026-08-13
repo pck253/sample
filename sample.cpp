@@ -1,10 +1,6 @@
 ﻿
 #include "common.h"
 
-MemoryPool* g_memoryPool{};
-Logger g_logger;
-StartTime g_startTime;
-
 int main(int _argc, char* _argv[])
 {
     if (_argc < 2)
@@ -35,7 +31,7 @@ int main(int _argc, char* _argv[])
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     } while (!app->IsShutdown());
 
-    SAFE_DELETE(app);
+    SafeDelete(app);
 
     return 0;
 }

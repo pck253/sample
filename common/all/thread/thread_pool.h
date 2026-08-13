@@ -33,37 +33,9 @@ public:
 	ThreadPool(const std::string& _name)
 		: m_name(_name)
 	{
-		m_beforeShutdown = [this]()
-			{
-				while (not m_jobs.empty())
-				{
-					Log("{} Shutdown : waiting until thread pool is empty.", m_name);
-				}
-			};
-
-		m_afterShutdown = [this]()
-			{
-				// if thread currently processing a task,
-				//   - It is terminating due to IsShutdown().
-				//   - The added job is deleted in the destructor.
-				// else
-				//   - After passing through the semaphore, the job is processed and then terminates due to IsShutdown().
-				for (auto& thread : m_threads)
-				{
-					m_jobs.push(new JobWrapper([] {}));
-				}
-				m_sem.release(m_threads.size());
-
-				for (auto& thread : m_threads)
-				{
-					thread.join();
-				}
-			};
 	}
 	~ThreadPool()
 	{
-		assert(IsShutdown());
-
 		IJobWrapper* job{};
 		while (m_jobs.try_pop(job))
 		{
@@ -91,7 +63,7 @@ public:
 						(*job)();
 						delete job;
 
-						if (IsShutdown())
+						if (IsShutdownStopping())
 						{
 							break;
 						}
@@ -127,6 +99,48 @@ public:
 		static_assert(!std::is_lvalue_reference_v<T_FUNC>, "PushJob only accepts rvalue callables");
 
 		return std::make_unique<JobWrapper<T_FUNC>>(std::move(_newJob));
+	}
+
+	uint16_t ThreadCount() const { return static_cast<uint16_t>(m_threads.size()); }
+
+protected:
+	virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override
+	{
+		_coordinator.Push(m_name + " drain",
+			[this]()
+			{
+				return m_jobs.empty() ? EStepResult::Done : EStepResult::Wait;
+			},
+			[this]() { return std::format("remain={}", m_jobs.unsafe_size()); });
+
+		_coordinator.PushStopping(m_name + " release threads", [this]()
+			{
+				// if thread currently processing a task,
+				//   - It is terminating due to IsShutdownStopping().
+				//   - The added job is deleted in the destructor.
+				// else
+				//   - After passing through the semaphore, the job is processed and then terminates due to IsShutdownStopping().
+				for (auto& thread : m_threads)
+				{
+					m_jobs.push(new JobWrapper([] {}));
+				}
+				m_sem.release(m_threads.size());
+
+				return EStepResult::Done;
+			});
+
+		_coordinator.PushStopping(m_name + " join threads", [this]()
+			{
+				for (auto& thread : m_threads)
+				{
+					if (thread.joinable())
+					{
+						thread.join();
+					}
+				}
+
+				return EStepResult::Done;
+			});
 	}
 
 private:

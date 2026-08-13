@@ -25,13 +25,13 @@ bool Handler(ServerSession& _server, ServerCommon::Activation&& _packet)
 	ServerSerial serial(_packet.serverId, _packet.moduleType, _packet.serverGroupId);
 
 	const auto serverSession = _server.Get<ServerSession>();
-	if (!Module::As<Server>()->GetServerSessionManager().AddAuthorizedSession(serial, serverSession))
+	if (!Module::As<Server>().GetServerSessionManager().AddAuthorizedSession(serial, serverSession))
 	{
 		auto jobInst = ThreadPool::MakeJobInst([serverSession]()
 			{
 				serverSession->Close(EError::AlreadyExistSameServer);
 			});
-		Module::As<Server>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 1000);
+		Module::As<Server>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 1000);
 	}
 	else
 	{
@@ -40,13 +40,13 @@ bool Handler(ServerSession& _server, ServerCommon::Activation&& _packet)
 				const auto serverSerial = serverSession->GetServerSerial();
 				Log("send Ping : to serverId {}, serverGroupId {}", serverSerial.id, serverSerial.groupId);
 
-				ServerCommon::Ping res(GET_TIME());
+				ServerCommon::Ping res(GetTime());
 
 				auto serializedInfo{ ZppBits::Serialize(res) };
 
 				serverSession->Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
 			});
-		Module::As<Server>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 3000);
+		Module::As<Server>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 3000);
 	}
 
 	return true;
@@ -55,7 +55,7 @@ bool Handler(ServerSession& _server, ServerCommon::Activation&& _packet)
 bool Handler(ServerSession& _server, ServerCommon::Shutdown&& _packet)
 {
 	Log("received shutdown.");
-	Module::As<Server>()->ShutdownApplicationByRemote();
+	Module::As<Server>().ShutdownApplicationByRemote();
 	return true;
 }
 
@@ -66,7 +66,7 @@ bool Handler(ServerSession& _server, ServerCommon::Ping&& _packet)
 			const auto serverSerial = _session.GetServerSerial();
 			Log("received Ping : from serverId {}, serverGroupId {}", serverSerial.id, serverSerial.groupId);
 
-			ServerCommon::Pong res(GET_TIME(), _packet.timestamp);
+			ServerCommon::Pong res(GetTime(), _packet.timestamp);
 
 			auto serializedInfo{ ZppBits::Serialize(res) };
 
@@ -87,13 +87,13 @@ bool Handler(ServerSession& _server, ServerCommon::Pong&& _packet)
 					const auto serverSerial = session->GetServerSerial();
 					Log("send Ping : to serverId {}, serverGroupId {}", serverSerial.id, serverSerial.groupId);
 
-					ServerCommon::Ping res(GET_TIME());
+					ServerCommon::Ping res(GetTime());
 
 					auto serializedInfo{ ZppBits::Serialize(res) };
 
 					session->Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
 				});
-			Module::As<Server>()->GetTimerJobManager()->PushTimerJob(std::move(jobInst), 3000);
+			Module::As<Server>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 3000);
 		});
 	return true;
 }

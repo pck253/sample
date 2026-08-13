@@ -41,6 +41,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\memory_pool.h">
       <Filter>all\allocator</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\shutdown_coordinator.h">
+      <Filter>all\utility</Filter>
+    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\shutdown_utility.h">
       <Filter>all\utility</Filter>
     </ClInclude>
@@ -56,6 +59,8 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)all\allocator\instance_pool.h">
       <Filter>all\allocator</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\id_utility.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)all\utility\random_utility.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="all">

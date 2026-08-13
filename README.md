@@ -9,14 +9,13 @@
 
 ## 기술 스택
 
-- **언어**: C++ 23
+- **언어**: C++ 23 (`stdcpplatest`)
 - **개발 환경**: Visual Studio 2026 (v145)
 - **빌드 시스템**: MSBuild (.vcxproj)
 - **패키징/직렬화**: zpp_bits (high-performance binary serialization)
 - **JSON 처리**: nlohmann/json
 - **웹 프레임워크**: C++ REST SDK (Casablanca)
 - **네트워크**: ASIO (Asynchronous I/O)
-- **HTTP 클라이언트**: curl
 - **스케줄링**: croncpp
 
 ## 프로젝트 구조
@@ -29,14 +28,16 @@ sample/
 ├── common/                        # 공용 유틸리티 라이브러리
 ├── config/                        # 모듈 설정 파일들
 ├── network/                       # 네트워크 모듈 (DLL)
-├── resource/                      # 리소스 파일
+├── resource/                      # 리소스 파일 (형상관리에 없음. 설정의 resource root 경로에 필요)
 ├── sdk/                           # 외부 라이브러리 SDK
 ├── server/                        # 서버 모듈 (DLL)
 ├── test_client/                   # 테스트 클라이언트 (DLL)
 ├── timer/                         # 타이머 모듈 (DLL)
 ├── web/                           # 웹/REST API 모듈 (DLL)
+├── x64/                           # 빌드 출력 (Debug/Release, 형상관리에 없음)
 ├── sample.sln                     # Visual Studio 솔루션
-├── sample.cpp/.h/.vcxproj         # 메인 애플리케이션
+├── sample.cpp/.vcxproj            # 메인 애플리케이션
+├── sample_*_debug*.bat            # 디버그 실행 스크립트
 ├── README.md                      # 이 문서
 └── 경력기술서.pdf                # 포트폴리오 문서
 ```
@@ -54,6 +55,10 @@ sample/
 - 비동기 I/O를 통한 고성능 소켓 통신
 - 클라이언트 연결 및 서버-간 통신 지원
 - `NetworkAccessor`: 네트워크 기능 인터페이스
+- **strand 기반 스레드 안전성**
+  - `SocketConnectionImpl`: 소켓 조작 개시와 종료를 `m_strand`로 직렬화. `Close()`는 호출자에게 비동기이며, 종료 통지(`ConnectionManager::OnClosed`)까지 strand 위에서 실행되어 상위 → 하위 재진입 데드락을 방지
+  - `Listener`: `asio::ip::tcp::acceptor`는 스레드 안전하지 않으므로 accept 개시/종료를 `m_acceptStrand`로 직렬화. Debug 빌드에서 `CHECK_ACCEPT_STRAND`로 strand 밖 호출을 감지
+  - closedHandler는 `ConnectionManager`가 연결과 함께 보관하고 연결 제거 시점에 호출
 
 #### 3. **server** (게임/애플리케이션 서버)
 - 메인 서버 로직
@@ -84,9 +89,12 @@ sample/
 - 메모리 풀 관리 (`MemoryPool`)
 - 로거 (`Logger`)
 - 모듈 기본 클래스 (`Module`)
+- 종료 조율 (`ShutdownCoordinator`, `UseShutdown`) - [종료 처리](#종료-처리) 참고
+- 스레드 풀 (`ThreadPool`), 직렬 작업 큐 (`SerializedJobQueue`)
 - 에러 처리 및 타입 정의
 - 수학, 시간, 문자열 유틸리티
-- 치트 커맨드 (`CheatCommand`) - 개발/디버그용 커맨드
+- 치트 커맨드 (`CheatCommandProcessor`) - 개발/디버그용 커맨드 (현재 사용처 없음)
+- 강한 타입 ID (`StrongId` / `DEFINE_STRONG_ID`), 난수 유틸리티
 
 #### 8. **sample** (메인 애플리케이션)
 - 설정 파일을 받아 모듈 로드 및 초기화
@@ -154,8 +162,8 @@ JSON 기반 설정으로 모듈 로드 및 초기화 관리:
 {
   "application": {
     "name": "Sample Server",
-    "config root": "../../config/",
-    "resource root": "../../resource/"
+    "config root": "./config/",
+    "resource root": "./config/"
   },
   "modules": [
     { "dll": "network.dll", "config": "network.config", "use": true },
@@ -173,6 +181,29 @@ JSON 기반 설정으로 모듈 로드 및 초기화 관리:
 - Windows 11 이상
 - x64 플랫폼
 
+### 사전 준비
+
+#### 1) cpprest 런타임 DLL
+
+cpprest는 소스 없이 바이너리만 포함되어 있습니다.
+`lib/`의 임포트 라이브러리는 형상관리에 포함되지만, `bin/`의 런타임 DLL은 `.gitignore`의 `[Bb]in/` 규칙에 걸려 빠지므로 별도로 확보해야 합니다.
+
+```
+sdk/cpprest/lib/cpprest142_2_10{,d}.lib    # 포함됨 (링크용)
+sdk/cpprest/bin/cpprest142_2_10{,d}.dll    # 빠짐  (런타임)
+```
+
+`web.vcxproj`의 **PreLink 이벤트**가 이 DLL을 출력 폴더로 복사하므로 별도 배포 작업은 필요 없습니다.
+DLL이 없으면 링크 이전에 `xcopy`가 먼저 실패합니다 (`MSB3073`).
+
+#### 2) 코드 생성 도구
+
+`business_common_lib`의 사전 빌드 단계가 `code_gen.exe`로 패킷 헤더를 생성하므로 코드 생성 도구를 먼저 빌드합니다.
+
+```bash
+dotnet build code_gen/code_gen.csproj -c Release
+```
+
 ### 빌드
 ```bash
 # Visual Studio에서 sample.sln 열기
@@ -181,13 +212,109 @@ msbuild sample.sln /p:Configuration=Release /p:Platform=x64
 ```
 
 ### 실행
-```bash
-# 설정 파일 경로를 인자로 전달
-sample.exe config/sample_1.config
 
-# 또는
-first_server.exe config/first_server.config
-second_server.exe config/second_server.config
+실행 파일은 `sample.exe` 하나이며, 어떤 모듈을 올릴지는 인자로 받은 설정 파일이 결정합니다.
+
+```bash
+# 실행 예제
+sample_server_debug_1.bat
+sample_server_debug_2.bat
+sample_test_client_debug.bat
+```
+
+### 정상 종료
+
+```bash
+http://127.0.0.1:30001/shutdown
+```
+
+`/shutdown` 을 받은 서버는 접속된 다른 서버에 `ServerCommon::Shutdown` 패킷을 브로드캐스트한 뒤 자신을 종료합니다.
+패킷을 받은 서버는 `ShutdownApplicationByRemote()` 로 동일한 종료 절차를 밟습니다.
+
+## 종료 처리
+
+모듈과 그 하위 객체들을 정해진 순서로, 서로의 스레드를 기다려가며 안전하게 내리기 위한 구조입니다.
+콜백(`m_beforeShutdown` / `m_afterShutdown`) 방식과 바쁜 대기 루프를 걷어내고 **단계(step) 큐**로 대체했습니다.
+
+### ShutdownCoordinator
+
+종료 작업을 단계 큐에 쌓아두고 한 스레드에서 순서대로 실행합니다.
+
+- **단계 결과**: `Done`(완료) / `Wait`(미완료 - 같은 단계를 다시 호출)
+- **대기 로그**: 1초 이상 머무는 단계만 `shutdown : waiting - <단계명> <상세>` 로 보고하여, 어디서 멈췄는지 즉시 드러남
+- **`Run()` 실행 스레드 제약**: 종료 대상이 소유한 스레드에서 호출하면 자기 자신을 join 하게 되므로 금지
+
+### 종료 상태
+
+각 종료 대상(`UseShutdown` 파생 객체)은 아래 상태를 앞으로만 진행합니다.
+
+| 상태 | 의미 |
+|------|------|
+| `Running` | 정상 동작 중 |
+| `Requested` | 종료 요청됨. 새 작업 유입 차단 |
+| `Stopping` | 스레드를 종료시켜도 되는 시점 |
+| `Completed` | 해당 대상의 모든 단계 완료 |
+
+- `Push()` - `Requested` 시점에 실행할 단계 등록 (작업 배수, 연결 정리 등)
+- `PushStopping()` - `Stopping` 시점에 실행할 단계 등록 (스레드 release/join)
+- 상태는 되돌아가지 않으므로, 이미 올라간 상태보다 낮은 단계를 등록하면 오류로 보고
+- `TargetSetter`가 중첩되어 상위 대상이 하위 대상의 단계를 자기 단계 중간에 끼워 넣을 수 있음 (예: `ConnectionManager` → `ThreadPool`)
+
+### 사용 방법
+
+종료 대상은 `UseShutdown`을 상속하고 `RegisterShutdownSteps()`만 구현합니다.
+
+```cpp
+class Foo : public UseShutdown
+{
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override
+    {
+        _coordinator.Push("foo drain",
+            [this]() { return m_jobs.empty() ? EStepResult::Done : EStepResult::Wait; },
+            [this]() { return std::format("remain={}", m_jobs.unsafe_size()); });
+
+        _coordinator.PushStopping("foo join threads", [this]()
+            {
+                for (auto& thread : m_threads) { if (thread.joinable()) thread.join(); }
+                return EStepResult::Done;
+            });
+    }
+};
+```
+
+모듈은 `Shutdown()`에서 소유한 대상들을 등록한 뒤 한 번에 실행합니다.
+
+```cpp
+void Timer::Shutdown()
+{
+    m_timerJobManagerAllocator.Shutdown(m_shutdownCoordinator, "timer ticker allocator shutdown.");
+
+    m_shutdownCoordinator.Run();
+}
+```
+
+`Module::Shutdown()`은 `protected`이며 `Application`만 호출할 수 있습니다. 모듈이 소유한 스레드에서 호출되면 self join 이 되기 때문입니다.
+
+### 작업 유입 차단
+
+`SerializedJobQueue`는 종료 대상이 아니라 **입구만 닫는** 방식입니다.
+`StopPush()` 이후의 `PushJob()`은 무시되고, 남은 작업은 소멸자에서 정리됩니다.
+세션(`UserSession`, `ServerSession`)의 `Closed()`가 이 경로를 사용합니다.
+
+### 종료 순서
+
+```
+Application 종료 요청 (restful /shutdown 또는 원격 ServerCommon::Shutdown 패킷)
+  └ ShutdownBusiness()   # server, test_client
+      ├ public 리스너 정지 → public 연결이 비워질 때까지 대기
+      ├ 서버 세션 종료 → 세션이 비워질 때까지 대기
+      ├ 타이머 작업 관리자 종료
+      └ 스레드 풀 배수 → release → join
+  └ ShutdownCommon()     # network, web, timer
+      ├ web    : 진행 중 요청 소진 → 대기 요청 응답 → 리스너 close
+      ├ timer  : 관리자별 tick 스레드 release → join
+      └ network: listener / connecter / imn 순으로 연결 정리 후 스레드 풀 종료
 ```
 
 ## 세션 관리
@@ -215,8 +342,10 @@ second_server.exe config/second_server.config
 | C++ REST SDK | - | RESTful API 서버 |
 | nlohmann/json | 3.11.2 | JSON 파싱 및 생성 |
 | zpp_bits | - | 고성능 직렬화 |
-| curl | 8.5.0 | HTTP 클라이언트 |
 | croncpp | - | 주기적 작업 스케줄링 |
+| magic_enum | - | 열거형 이름 문자열화 (로그/포맷터) |
+
+> `sdk/curl-8.5.0/` 소스는 남아 있으나 현재 어떤 모듈도 링크하지 않습니다. HTTP 클라이언트가 필요해지면 web 모듈에 다시 연결해야 합니다.
 
 ## 프로젝트 구성 파일
 
@@ -224,7 +353,6 @@ second_server.exe config/second_server.config
 - **sample.sln**: 메인 Visual Studio 솔루션
 - **sample.vcxproj**: 메인 애플리케이션 프로젝트
 - **sample.vcxproj.filters**: 프로젝트 필터 설정
-- **sample.vcxproj.user**: 실행 설정 (디버그 설정 등)
 
 ### 모듈 프로젝트
 - **business_common_lib.vcxproj**: 비즈니스 공통 라이브러리
@@ -243,12 +371,20 @@ second_server.exe config/second_server.config
 
 ## 디버그 설정
 
-워크스페이스에 포함된 .lnk 파일들:
-- `sample_server_debug_1.lnk`: 첫 번째 서버 디버그 실행
-- `sample_server_debug_2.lnk`: 두 번째 서버 디버그 실행
-- `sample_test_client_debug.lnk`: 테스트 클라이언트 디버그 실행
+워크스페이스에 포함된 실행 스크립트는 모두 `sample.exe`에 설정 파일 경로를 인자로 넘깁니다.
+경로가 저장소 루트 기준 상대 경로이므로 체크아웃 위치와 무관하게 동작하지만, 루트에서 실행해야 합니다.
+
+| 스크립트 | 설정 파일 | 올라가는 모듈 |
+|---|---|---|
+| `sample_server_debug_1.bat` | `config/sample_1.config` | network, web, timer, server (`first_server.config`) |
+| `sample_server_debug_2.bat` | `config/sample_2.config` | network, web, timer, server (`second_server.config`) |
+| `sample_test_client_debug.bat` | `config/test.config` | network, timer, test_client |
+
+```bat
+.\x64\Debug\sample.exe .\config\sample_1.config
+```
 
 ---
 
-**마지막 업데이트**: 2026년 5월 15일  
-**문서 작성자**: Claude Haiku 4.5
+**마지막 업데이트**: 2026년 8월 13일  
+**문서 작성자**: Claude Haiku 4.5 (종료 처리 및 빌드/실행 항목 개정: Claude Opus 5)

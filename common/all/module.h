@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 enum class EModule : uint8_t
 {
@@ -14,8 +14,8 @@ enum class EModule : uint8_t
 template <>
 struct std::formatter<EModule, char> : std::formatter<int, char>
 {
-	template <class FormatContext>
-	auto format(const EModule& _val, FormatContext& _formatCtx) const
+	template <class T_FORMAT_CONTEXT>
+	auto format(const EModule& _val, T_FORMAT_CONTEXT& _formatCtx) const
 	{
 		return std::format_to(_formatCtx.out(), "{}", std::underlying_type_t<EModule>(_val));
 	}
@@ -41,10 +41,11 @@ protected:
 
 // ----------------------------------------------------------------------------------
 
-class Module;
-using CreateModuleFunc_t = Module * (*)(const char*, MemoryPool*);
-
 class Application;
+class Module;
+
+using CreateModuleFunc_t = Module* (*)(Application&, const char*, MemoryPool*);
+
 class Module
 {
 public:
@@ -64,10 +65,11 @@ public:
 public:
 	virtual ~Module()
 	{
-		SAFE_DELETE(m_accessor);
+		SafeDelete(m_accessor);
 	}
 
-	Module(const std::string& _configFilePath) : m_configFilePath(_configFilePath)
+	Module(Application& _application, const std::string& _configFilePath)
+		: m_configFilePath(_configFilePath), m_application(_application), m_refLogger(g_logger)
 	{
 		// -------------------------------------------------------------------
 		// module is singleton
@@ -81,21 +83,21 @@ public:
 		}
 
 		m_self = this;
-		m_refLogger = &g_logger;
 	};
 
 	virtual bool IsBusinessModule() = 0;
 	virtual EModule GetModuleType() = 0;
 
 	template<class T = Module> requires std::derived_from<T, Module>
-	static T* As()
+	static T& As()
 	{
-		return dynamic_cast<T*>(m_self);
+		assert(nullptr != m_self);
+		return dynamic_cast<T&>(*m_self);
 	}
 
 	virtual Result Init()
 	{
-		m_refLogger->SetPrefix(GetModuleName(GetModuleType()));
+		m_refLogger.SetPrefix(GetModuleName(GetModuleType()));
 
 		std::ifstream f(m_configFilePath);
 
@@ -146,28 +148,32 @@ public:
 			}
 			auto debugCategory = logConfig["debug categories"];
 
-			m_refLogger->SetConfiguration(logLevel, std::move(useDebugLogCategory));
+			m_refLogger.SetConfiguration(logLevel, std::move(useDebugLogCategory));
 		}
 
 		return InitImpl();
 	}
 
-	virtual void Shutdown() = 0;
-
-	void SetApplication(Application* _application) noexcept { m_application = _application; }
 	ModuleAccessor* GetAccessor() { return m_accessor; }
 
-	inline void SetLogHandler(LogHandler_t&& _logHandler) { m_refLogger->SetLogHandler(std::move(_logHandler)); }
+	inline void SetLogHandler(LogHandler_t&& _logHandler) { m_refLogger.SetLogHandler(std::move(_logHandler)); }
 
 protected:
+	// only Application can shutdown a module.
+	// it must not be called on a thread owned by the module. (self join)
+	friend class Application;
+	virtual void Shutdown() = 0;
 
 	virtual Result InitImpl() = 0;
-	Application* GetApplication()
+	Application& GetApplication()
 	{
 		return m_application;
 	}
 
 protected:
+	// Shutdown() registers the steps of everything it owns, then runs them here.
+	ShutdownCoordinator m_shutdownCoordinator;
+
 	static inline std::atomic_bool m_created = false;
 	static inline Module* m_self = nullptr;
 
@@ -176,9 +182,9 @@ protected:
 	nlohmann::json m_config;
 	std::string m_configFilePath;
 
-	Application* m_application = nullptr;
+	Application& m_application;
 
-	Logger* m_refLogger = nullptr;
+	Logger& m_refLogger;
 };
 
 #ifdef _USRDLL

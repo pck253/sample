@@ -3,6 +3,7 @@
 static_assert(NETWORK_MODULE == 1);
 
 class Network;
+
 class ConnectionManager : public UseShutdown
 {
 public:
@@ -28,18 +29,41 @@ public:
 		}
 	}
 
-	void OnClosed(const ConnectionId_t& _connectionId, const bool& _isPublic)
+	void OnClosed(const Result& _reason, const ConnectionId_t _connectionId, const bool _isPublic)
 	{
 		Log("OnClosed");
+
+		ClosedHandler_t closedHandler{};
 		if (_isPublic)
 		{
 			SCOPED_WRITE_LOCK(m_publicConnectionMutex);
-			m_publicConnections.erase(_connectionId);
+			const auto itor = m_publicConnections.find(_connectionId);
+			if (m_publicConnections.end() == itor)
+			{
+				return;
+			}
+			closedHandler = std::get<ClosedHandler_t>(itor->second);
+			m_publicConnections.erase(itor);
 		}
 		else
 		{
 			SCOPED_WRITE_LOCK(m_privateConnectionMutex);
-			m_privateConnections.erase(_connectionId);
+			const auto itor = m_privateConnections.find(_connectionId);
+			if (m_privateConnections.end() == itor)
+			{
+				return;
+			}
+			closedHandler = std::get<ClosedHandler_t>(itor->second);
+			m_privateConnections.erase(itor);
+		}
+
+		if (closedHandler)
+		{
+			closedHandler(_reason, _connectionId, _isPublic);
+		}
+		else
+		{
+			LogError("closed handler is null");
 		}
 	}
 
@@ -61,10 +85,37 @@ protected:
 			break;
 		}
 	}
-	void ShutdownThreadPool()
+	void PushShutdownThreadPoolSteps(ShutdownCoordinator& _coordinator, const std::string& _name)
 	{
-		m_asioThreadPool.Shutdown();
-		m_cvThreadPool.Shutdown("ConnectionManager's thread pool shutdown.");
+		m_asioThreadPool.PushShutdownSteps(_coordinator, _name);
+		m_cvThreadPool.Shutdown(_coordinator, "ConnectionManager's thread pool shutdown.");
+	}
+
+	void PushCloseConnectionSteps(ShutdownCoordinator& _coordinator, const std::string& _name, const bool _closePublic)
+	{
+		_coordinator.Push(_name + " close connections", [this, _closePublic]()
+			{
+				if (_closePublic)
+				{
+					CloseAll(true);
+				}
+				CloseAll(false);
+
+				return EStepResult::Done;
+			});
+
+		if (_closePublic)
+		{
+			_coordinator.Push(_name + " public connections closed", [this]()
+				{
+					return IsEmptyConnection(true) ? EStepResult::Done : EStepResult::Wait;
+				});
+		}
+
+		_coordinator.Push(_name + " private connections closed", [this]()
+			{
+				return IsEmptyConnection(false) ? EStepResult::Done : EStepResult::Wait;
+			});
 	}
 
 	asio::io_context* GetAsioContext()
@@ -72,11 +123,25 @@ protected:
 		return (EThreadPool::ASIO == m_threadPoolType) ? m_asioThreadPool.GetIoContext() : nullptr;
 	}
 
-	bool IsEmptyConnection(const bool& _isPublic)
+	bool IsEmptyConnection(const bool& _isPublic, const std::optional<AcceptorIndex>& _acceptorIndex = {}) const
 	{
 		if (_isPublic)
 		{
 			SCOPED_READ_LOCK(m_publicConnectionMutex);
+			if (_acceptorIndex.has_value())
+			{
+				for (const auto& [connection, _] : m_publicConnections | std::views::values)
+				{
+					SocketConnectionImpl* impl = static_cast<SocketConnectionImpl*>(connection.get());
+					if (*_acceptorIndex == impl->GetAcceptorIndex())
+					{
+						return false;
+					}
+				}
+
+				return true;
+			}
+
 			return m_publicConnections.empty();
 		}
 
@@ -84,27 +149,42 @@ protected:
 		return m_privateConnections.empty();
 	}
 
-	bool AddConnection(const ConnectionShared_t& _conn)
+	bool AddConnection(const ConnectionShared_t& _conn, const ClosedHandler_t _closedHandler)
+	{
+		return AddConnection(_conn, _closedHandler, []() {});
+	}
+
+	template<typename T_ON_ADDED>
+	bool AddConnection(const ConnectionShared_t& _conn, const ClosedHandler_t _closedHandler, T_ON_ADDED&& _onAdded)
 	{
 		if (_conn->IsPublic())
 		{
 			SCOPED_WRITE_LOCK(m_publicConnectionMutex);
-			if (IsShutdown())
+			if (IsShutdownStarted())
 			{
 				return false;
 			}
-			m_publicConnections.emplace(_conn->GetConnectionId(), _conn);
+			auto [_, inserted] = m_publicConnections.emplace(_conn->GetConnectionId(), std::make_tuple(_conn, _closedHandler));
+			if (inserted)
+			{
+				std::forward<T_ON_ADDED>(_onAdded)();
+			}
+			return inserted;
 		}
 		else
 		{
 			SCOPED_WRITE_LOCK(m_privateConnectionMutex);
-			if (IsShutdown())
+			if (IsShutdownStarted())
 			{
 				return false;
 			}
-			m_privateConnections.emplace(_conn->GetConnectionId(), _conn);
+			auto [_, inserted] = m_privateConnections.emplace(_conn->GetConnectionId(), std::make_tuple(_conn, _closedHandler));
+			if (inserted)
+			{
+				std::forward<T_ON_ADDED>(_onAdded)();
+			}
+			return inserted;
 		}
-		return true;
 	}
 
 	void CloseAll(const bool& _isPublic, const std::optional<AcceptorIndex>& _acceptorIndex = {})
@@ -112,7 +192,7 @@ protected:
 		if (_isPublic)
 		{
 			SCOPED_READ_LOCK(m_publicConnectionMutex);
-			for (auto& [connectionId, connection] : m_publicConnections)
+			for (const auto& [connection, _] : m_publicConnections | std::views::values)
 			{
 				SocketConnectionImpl* impl = static_cast<SocketConnectionImpl*>(connection.get());
 				if (_acceptorIndex.has_value() && *_acceptorIndex != impl->GetAcceptorIndex())
@@ -125,22 +205,12 @@ protected:
 		else
 		{
 			SCOPED_READ_LOCK(m_privateConnectionMutex);
-			for (auto& [connectionId, connection] : m_privateConnections)
+			for (const auto& [connection, _] : m_privateConnections | std::views::values)
 			{
 				connection->Close(EError::Shutdown);
 			}
 		}
 	}
-	void CloseAllAndWait(const bool& _isPublic, const std::optional<AcceptorIndex>& _acceptorIndex = {})
-	{
-		CloseAll(_isPublic, _acceptorIndex);
-
-		do
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		} while (!IsEmptyConnection(_isPublic));
-	}
-
 protected:
 	class AsioThreadPool
 	{
@@ -161,20 +231,34 @@ protected:
 					});
 			}
 		}
-		void Shutdown()
+
+		void PushShutdownSteps(ShutdownCoordinator& _coordinator, const std::string& _name)
 		{
-			if (m_workGuard)
-			{
-				m_workGuard->reset();
-			}
+			_coordinator.Push(_name + " asio work guard reset", [this]()
+				{
+					if (m_workGuard)
+					{
+						m_workGuard->reset();
+					}
 
-			for (auto& thread : m_threads)
-			{
-				thread.join();
-			}
-			SAFE_DELETE(m_workGuard);
+					return ShutdownCoordinator::EStepResult::Done;
+				});
 
-			m_ioContext.stop();
+			_coordinator.Push(_name + " asio join threads", [this]()
+				{
+					for (auto& thread : m_threads)
+					{
+						if (thread.joinable())
+						{
+							thread.join();
+						}
+					}
+					SafeDelete(m_workGuard);
+
+					m_ioContext.stop();
+
+					return ShutdownCoordinator::EStepResult::Done;
+				});
 		}
 
 		inline asio::io_context* GetIoContext() { return &m_ioContext; }
@@ -194,9 +278,9 @@ protected:
 	AsioThreadPool m_asioThreadPool;
 	ThreadPool m_cvThreadPool;
 
-	std::shared_mutex m_publicConnectionMutex;
-	std::unordered_map<ConnectionId_t, ConnectionShared_t> m_publicConnections;
+	mutable std::shared_mutex m_publicConnectionMutex;
+	std::unordered_map<ConnectionId_t, std::tuple<ConnectionShared_t, ClosedHandler_t>> m_publicConnections;
 
-	std::shared_mutex m_privateConnectionMutex;
-	std::unordered_map<ConnectionId_t, ConnectionShared_t> m_privateConnections;
+	mutable std::shared_mutex m_privateConnectionMutex;
+	std::unordered_map<ConnectionId_t, std::tuple<ConnectionShared_t, ClosedHandler_t>> m_privateConnections;
 };

@@ -1,11 +1,11 @@
 ﻿#pragma once
 
-using AuthKey_t = UniqueId_t;
+DEFINE_STRONG_ID(AuthKey_t, uint64_t, 0ui64);
 
-using ServerId_t = StrongId<uint16_t, 0ui16>;
-using ServerGroupId_t = StrongId<uint16_t, 0ui16>;
+DEFINE_STRONG_ID(ServerId_t, uint16_t, 0ui16);
+DEFINE_STRONG_ID(ServerGroupId_t, uint16_t, 0ui16);
 
-using WorldPos_t = Vector<double>;
+using WorldPos_t = Vector<double, 0.0>;
 
 class Actor;
 using ActorShared_t = std::shared_ptr<Actor>;

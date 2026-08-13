@@ -1,6 +1,6 @@
 #pragma once
 
-using RestufulRequestId_t = StrongId<uint64_t, 0ui64>;
+using RestufulRequestId_t = uint64_t;
 
 class WebAccessor;
 using RestfulHandler_t = bool(*)(const RestufulRequestId_t&, const std::wstring&, const std::wstring&, WebAccessor*);
@@ -83,12 +83,12 @@ public:
 
 struct WebHelper
 {
-	Result SettingByConfig(const nlohmann::json& _config, Application* _application, ModuleAccessor*& _webAccessor, const RestfulHandler_t _requestHandler)
+	Result SettingByConfig(const nlohmann::json& _config, Application& _application, ModuleAccessor*& _webAccessor, const RestfulHandler_t _requestHandler)
 	{
 		auto webConfig = _config["restful config"];
 		if (!webConfig.is_null())
 		{
-			auto webModule = _application->GetModule(EModule::Web);
+			auto webModule = _application.GetModule(EModule::Web);
 			if (!webModule)
 			{
 				return EError::NotExistModule;

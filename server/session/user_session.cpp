@@ -23,7 +23,7 @@ void UserSession::Close(const Result& _reason)
 
 void UserSession::Closed(const Result& _result)
 {
-	Shutdown("user session shutdown.");
+	StopPush("user session shutdown.");
 }
 
 void UserSession::InitPacketHandlers()
@@ -36,7 +36,7 @@ void UserSession::UninitPacketHandlers()
 {
 	for (auto& [protocol, handler] : m_packetHandlerCallers)
 	{
-		SAFE_DELETE(handler);
+		SafeDelete(handler);
 	}
 	m_packetHandlerCallers.clear();
 }

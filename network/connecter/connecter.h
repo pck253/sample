@@ -16,6 +16,9 @@ public:
 	Result RequestConnect(const std::string& _address, const uint16_t& _port, const ConnectedConfig& _connectedConfig);
 	Result RequestConnect(const std::string& _connecterName, const ConnectedConfig& _connectedConfig, const uint16_t& _tryReconnectCount);
 
+protected:
+	virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
+
 private:
 	void OnConnected(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const ConnectedConfig& _connectedConfig, const ConnectionShared_t& _conn,
 		const std::string& _connecterName, const uint16_t _tryReconnectCount);

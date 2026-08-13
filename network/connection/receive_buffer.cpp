@@ -66,7 +66,7 @@ void ReceiveBuffer::Read(std::vector<uint8_t>& _output)
 
 ReservedReceiveBuffer_t ReceiveBuffer::GetWritableBuffer()
 {
-	if (m_freeSize == 0)
+	if (0 == m_freeSize)
 	{
 		return ReservedReceiveBuffer_t();
 	}
@@ -86,12 +86,12 @@ ReservedReceiveBuffer_t ReceiveBuffer::GetWritableBuffer()
 		buffers.emplace_back(std::make_pair(&(m_buffer[m_writableIndex]), m_readableIndex - m_writableIndex));
 	}
 
-	return std::move(buffers);
+	return buffers;
 }
 
 void ReceiveBuffer::UpdateWritableBufferInfo(const size_t& _usedSize)
 {
-	if (_usedSize == 0)
+	if (0 == _usedSize)
 	{
 		return;
 	}

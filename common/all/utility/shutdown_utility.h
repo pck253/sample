@@ -6,38 +6,46 @@ public:
 	UseShutdown() = default;
 	virtual ~UseShutdown()
 	{
-		m_beforeShutdown = nullptr;
-		m_afterShutdown = nullptr;
+		const auto state = m_shutdownState.load(std::memory_order_acquire);
+		if (EShutdownState::Completed != state)
+		{
+			LogError("destroyed. shutdown is not completed : {}", magic_enum::enum_name(state));
+			assert(EShutdownState::Completed == state);
+		}
 	}
 
-	virtual void Shutdown(const char* _msg = nullptr)
+	void Shutdown(ShutdownCoordinator& _coordinator, const char* _msg = nullptr)
 	{
-		if (IsShutdown())
+		if (!EnterShutdown(_msg))
 		{
 			return;
 		}
 
-		if (m_beforeShutdown)
-		{
-			m_beforeShutdown();
-		}
-
-		m_isShutdown.store(true, std::memory_order_relaxed);
-		if (_msg)
-		{
-			Log("Shutdown : {}", _msg);
-		}
-
-		if (m_afterShutdown)
-		{
-			m_afterShutdown();
-		}
+		ShutdownCoordinator::TargetSetter targetSetter(_coordinator, m_shutdownState, _msg);
+		RegisterShutdownSteps(_coordinator);
 	}
-	inline bool IsShutdown() const { return m_isShutdown; }
+
+	inline bool IsShutdownStarted() const { return m_shutdownState.load() != EShutdownState::Running; }
+	inline bool IsShutdownStopping() const { return m_shutdownState.load(std::memory_order_acquire) >= EShutdownState::Stopping; }
 
 protected:
-	std::atomic<bool> m_isShutdown{ false };
+	using EStepResult = ShutdownCoordinator::EStepResult;
 
-	std::function<void()> m_beforeShutdown;
-	std::function<void()> m_afterShutdown;
+	virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) {}
+
+	// the CAS pairs with IsShutdownStarted() on the other side. both must stay seq_cst.
+	bool EnterShutdown(const char* _msg)
+	{
+		auto expectedState = EShutdownState::Running;
+		if (!m_shutdownState.compare_exchange_strong(expectedState, EShutdownState::Requested))
+		{
+			LogWarning("Shutdown is ignored. already {} : {}", magic_enum::enum_name(expectedState), _msg ? _msg : "no message");
+			return false;
+		}
+
+		return true;
+	}
+
+protected:
+	std::atomic<EShutdownState> m_shutdownState{ EShutdownState::Running };
 };

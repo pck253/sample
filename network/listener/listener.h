@@ -11,7 +11,7 @@ struct AcceptorInfo
     // acceptor
     //   cancel() : cancel async job.
     //   close() : disconnect && destroy socket.
-    //   release() : cancel && relase ownership of socket, return value is socket handle.
+    //   release() : cancel && release ownership of socket, return value is socket handle.
     asio::ip::tcp::acceptor acceptor;
     /////////////////////////////////////////////////////////////////////////////////////
     bool isPublic = false;
@@ -42,12 +42,26 @@ public:
     Result SetAcceptedConfig(const std::string& _listenerName, const AcceptedConfig& _acceptedConfig);
 
     void StopPublicListen(const std::string& _listenerName);
-    void ClosePublicConnection(const std::string& _listenerName);
+    bool IsEmptyPublicConnection(const std::string& _listenerName) const;
+
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
 
 private:
-    void OnAccepted(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const AcceptorIndex& _acceptorIndex, ConnectionShared_t _conn);
+    // ----------------------------------------------------------------------------------
+    // asio::ip::tcp::acceptor is not thread-safe.
+    //     acceptor must be used via asio::post(m_acceptStrand).
+    // debug build reports a violation : see CHECK_ACCEPT_STRAND in listener.cpp
+    // ----------------------------------------------------------------------------------
+    void StartAccept(const AcceptorIndex _acceptorIndex);
+    void CloseAcceptor(const AcceptorIndex _acceptorIndex);
+
+    void OnAccepted(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const AcceptorIndex _acceptorIndex, const ConnectionShared_t& _conn);
 
 private:
+    asio::strand<asio::io_context::executor_type> m_acceptStrand;
     std::vector<AcceptorInfo> m_acceptorInfos;
     std::unordered_map<std::string, AcceptorIndex> m_acceptorNames;
+
+    std::atomic_bool m_acceptorsClosed{ false };
 };

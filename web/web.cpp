@@ -4,8 +4,8 @@ static_assert(WEB_MODULE == 1);
 
 MODULE_STATIC_IMPL(Web);
 
-Web::Web(const std::string& _configFilePath)
-	: Module(_configFilePath), m_restful(*this)
+Web::Web(Application& _application, const std::string& _configFilePath)
+	: Module(_application, _configFilePath), m_restful(*this)
 {
 	m_accessor = WebAccessorImpl::Create(this);
 }
@@ -88,7 +88,13 @@ Result Web::InitImpl()
 
 void Web::Shutdown()
 {
-	m_restful.Shutdown("restful shutdown.");
+	m_restful.Shutdown(m_shutdownCoordinator, "restful shutdown.");
 
-	curl_global_cleanup();
+	m_shutdownCoordinator.Push("curl global cleanup", []()
+		{
+			curl_global_cleanup();
+			return ShutdownCoordinator::EStepResult::Done;
+		});
+
+	m_shutdownCoordinator.Run();
 }

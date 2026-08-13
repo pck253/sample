@@ -5,16 +5,20 @@ static_assert(NETWORK_MODULE == 1);
 Connecter::Connecter(Network* _networkMoudle)
 	: ConnectionManager(_networkMoudle, EThreadPool::ASIO)
 {
-	m_afterShutdown = [this]()
+}
+
+void Connecter::RegisterShutdownSteps(ShutdownCoordinator& _coordinator)
+{
+	_coordinator.Push("connecter clear connect infos", [this]()
 		{
 			m_connectInfos.clear();
 
-			CloseAllAndWait(false);
+			return EStepResult::Done;
+		});
 
-			ShutdownThreadPool();
+	PushCloseConnectionSteps(_coordinator, "connecter", false);
 
-			Log("Shutdown Connecter");
-		};
+	PushShutdownThreadPoolSteps(_coordinator, "connecter");
 }
 
 Connecter::~Connecter()
@@ -34,12 +38,7 @@ Result Connecter::RequestConnect(const std::string& _address, const uint16_t& _p
 {
 	asio::ip::tcp::socket* socket = new asio::ip::tcp::socket(*GetAsioContext());
 	ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
-	ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler, _connectedConfig.closedHandler);
-
-	if (not AddConnection(conn))
-	{
-		return EError::FailedAddConnection;
-	}
+	const ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler);
 
 	asio::ip::tcp::endpoint endpoint(asio::ip::make_address(_address), _port);
 	socket->async_connect(endpoint, std::bind(&Connecter::OnConnected, this, std::placeholders::_1, socket, _connectedConfig, conn, "", 0));
@@ -67,12 +66,7 @@ Result Connecter::RequestConnect(const std::string& _connecterName, const Connec
 
 	asio::ip::tcp::socket* socket = new asio::ip::tcp::socket(*GetAsioContext());
 	ConnectionId_t connectionId = m_networkMoudle.MakeConnectionId();
-	ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler, _connectedConfig.closedHandler);
-
-	if (not AddConnection(conn))
-	{
-		return EError::FailedAddConnection;
-	}
+	const ConnectionShared_t conn = SocketConnectionImpl::Create(socket, connectionId, GetAsioContext(), false, NOT_FROM_ACCEPTOR, *this, _connectedConfig.receivedHandler);
 
 	socket->async_connect(found->second, std::bind(&Connecter::OnConnected, this, std::placeholders::_1, socket, _connectedConfig, conn, _connecterName, _tryReconnectCount));
 
@@ -82,16 +76,37 @@ Result Connecter::RequestConnect(const std::string& _connecterName, const Connec
 void Connecter::OnConnected(const asio::error_code& _error, asio::ip::tcp::socket* _socket, const ConnectedConfig& _connectedConfig, const ConnectionShared_t& _conn,
 	const std::string& _connecterName, const uint16_t _tryReconnectCount)
 {
-	Result result;
-	if (!_error)
+	// remote_endpoint can be failed when the peer has disconnected.
+	asio::error_code error = _error;
+	asio::ip::tcp::endpoint remoteEndpoint;
+	if (!error)
 	{
-		std::string remoteAddr = _socket->remote_endpoint().address().to_string();
+		remoteEndpoint = _socket->remote_endpoint(error);
+		if (error)
+		{
+			LogWarning("failed to get remote endpoint : {}", error.message());
+		}
+	}
+
+	Result result;
+	if (!error)
+	{
+		std::string remoteAddr = remoteEndpoint.address().to_string();
 
 		SocketConnectionImpl* impl = static_cast<SocketConnectionImpl*>(_conn.get());
 		impl->SetRemoteAddress(remoteAddr);
-		bool handlerResult = (*_connectedConfig.connectedHandler)(result, _connecterName, _conn);
 
-		if (handlerResult)
+		if (not AddConnection(_conn, _connectedConfig.closedHandler))
+		{
+			result = EError::FailedAddConnection;
+		}
+
+		bool handlerResult = (*_connectedConfig.connectedHandler)(result, _connecterName, !result ? nullptr : _conn);
+		if (!result)
+		{
+			_conn->Close(result);
+		}
+		else if (handlerResult)
 		{
 			impl->InitReceive();
 
@@ -115,7 +130,6 @@ void Connecter::OnConnected(const asio::error_code& _error, asio::ip::tcp::socke
 		}
 
 		result = EError::FailedNetworkConnect;
-		_conn->Close(result);
 
 		(*_connectedConfig.connectedHandler)(result, _connecterName, nullptr);
 	}

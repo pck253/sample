@@ -5,8 +5,8 @@ static_assert(TIMER_MODULE == 1);
 struct TimerJob
 {
     TimerJobAccessor_t accessor;
-    TickTime_t expireTickTime = 0;
-    TickTime_t _elapsedTickTime = 0;
+    SteadyTime_t expireTickTime = 0;
+    SteadyTime_t _elapsedTickTime = 0;
     cron::cronexpr cronExpr;
     ThreadPool::JobInst_t jobInst;
     ETimerJobRepeatMode repeatMode = ETimerJobRepeatMode::None;
@@ -37,14 +37,17 @@ public:
 
     ~TimerJobManagerImpl() = default;
 
-    virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) final;
+    virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const SteadyTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) final;
     virtual TimerJobAccessor_t PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode = ETimerJobRepeatMode::None) final;
+
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
 
 private:
     TimerJobManagerImpl(const std::chrono::milliseconds& _timerResolution, ThreadPool& _threadPoolRef);
 
-    TimerJobAccessor_t PushTimerJobImpl(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode);
-    void RepeatTimerJob(const TimerJobShared_t& _timerJob, const TickTime_t& _nowTickTime);
+    TimerJobAccessor_t PushTimerJobImpl(ThreadPool::JobInst_t&& _jobInst, const SteadyTime_t& _elapsedTickTime, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode);
+    void RepeatTimerJob(const TimerJobShared_t& _timerJob, const SteadyTime_t& _nowTickTime);
 
     void OnTime(TimerJobShared_t&& _job);
 
@@ -66,6 +69,9 @@ public:
     ~TimerJobManagerAllocator() = default;
 
     TimerJobManagerImplShared_t AllocTimerJobManager(const std::chrono::milliseconds& _timerResolution, ThreadPool& _threadPool);
+
+protected:
+    virtual void RegisterShutdownSteps(ShutdownCoordinator& _coordinator) override;
 
 private:
     std::shared_mutex m_mutex;

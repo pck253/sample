@@ -1,7 +1,7 @@
 #pragma once
 
 using ConnectionId_t = uint64_t;
-#define INVALID_CONNECTION_ID 0
+static constexpr ConnectionId_t INVALID_CONNECTION_ID{ 0 };
 
 using PacketSize_t = uint16_t;
 

@@ -6,14 +6,16 @@ class Network : public Module
 {
     friend Module;
 public:
-    Network(const std::string& _configFilePath);
+    Network(Application& _application, const std::string& _configFilePath);
     ~Network();
 
     virtual bool IsBusinessModule() final { return false; }
     virtual EModule GetModuleType() final { return EModule::Network; }
 
+protected:
     virtual void Shutdown() final;
 
+public:
     inline Listener& GetListener() { return m_listener; }
     inline Connecter& GetConnecter() { return m_connecter; }
     inline ImnManager& GetImnManager() { return m_imnManager; }

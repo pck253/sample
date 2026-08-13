@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #if !defined(_USRDLL) && !defined(_LIB)
 #include <minidumpapiset.h>
@@ -104,11 +104,15 @@ public:
 			{
 				switch (_logLevel)
 				{
-				case ELogLevel::Normal:		printf_s("[%s]%s\n", _who, _log); break;
-				case ELogLevel::Error:		printf_s("[%s][Error]%s\n", _who, _log); break;
-				case ELogLevel::Warning:	printf_s("[%s][Warning]%s\n", _who, _log); break;
-				case ELogLevel::Debug:		printf_s("[%s][Debug]%s\n", _who, _log); break;
+				case ELogLevel::Normal:		printf_s("\033[0m[%s]%s\n", _who, _log); break;
+				case ELogLevel::Error:		printf_s("\033[31m[%s][Error]%s\n", _who, _log); break;
+				case ELogLevel::Warning:	printf_s("\033[33m[%s][Warning]%s\n", _who, _log); break;
+				case ELogLevel::Debug:		printf_s("\033[34m[%s][Debug]%s\n", _who, _log); break;
 				}
+
+				// stdout is block buffered once redirected. a log that is meant to be read
+				// while the process is stuck has to be on disk before it gets stuck.
+				fflush(stdout);
 			});
 	}
 	virtual ~Application()
@@ -120,7 +124,7 @@ public:
 		Modules_t temp = std::move(m_modules);
 		for (auto& module : temp)
 		{
-			SAFE_DELETE(module.second);
+			SafeDelete(module.second);
 		}
 
 		for (auto& [dllHandler, isBusiness] : m_dllHandlers)
@@ -150,7 +154,7 @@ public:
 		}
 		catch (std::exception& _ex)
 		{
-			LogError("", _ex.what());
+			LogError("{}", _ex.what());
 			return EError::InvalidConfig;
 		}
 
@@ -252,7 +256,7 @@ public:
 				return EError::FailedCreateModule;
 			}
 
-			auto module = (*createModuleFunc)(configPath.generic_string().c_str(), g_memoryPool);
+			auto module = (*createModuleFunc)(*this, configPath.generic_string().c_str(), g_memoryPool);
 			if (!module)
 			{
 				FreeLibrary(h);
@@ -263,7 +267,7 @@ public:
 			if (!AddModule(module))
 			{
 				FreeLibrary(h);
-				SAFE_DELETE(module);
+				SafeDelete(module);
 				LogError("failed to add module : {}", dll.c_str());
 				return EError::DuplicatedModule;
 			}
@@ -273,7 +277,7 @@ public:
 
 		if (m_modules.empty())
 		{
-			LogError("module empty : {}");
+			LogError("module empty");
 			return EError::EmptyModule;
 		}
 
@@ -341,7 +345,6 @@ protected:
 		auto ret = m_modules.emplace(_module->GetModuleType(), _module);
 		if (ret.second)
 		{
-			_module->SetApplication(this);
 			LogHandler_t copied = g_logger.GetLogHandler();
 			_module->SetLogHandler(std::move(copied));
 		}

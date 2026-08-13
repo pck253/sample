@@ -4,17 +4,19 @@ class Server : public Module
 {
     friend Module;
 public:
-    explicit Server(const std::string& _configFilePath);
+    Server(Application& _application, const std::string& _configFilePath);
     ~Server();
 
     virtual bool IsBusinessModule() final { return true; }
     virtual EModule GetModuleType() final { return EModule::Server; }
 
+protected:
     virtual void Shutdown() final;
 
+public:
     void ShutdownApplicationByRemote()
     {
-        GetApplication()->Shutdown();
+        GetApplication().Shutdown();
     }
 
     ServerId_t GetServerId() { return m_id; }

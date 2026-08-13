@@ -5,24 +5,17 @@ static_assert(TIMER_MODULE == 1);
 TimerJobManagerImpl::TimerJobManagerImpl(const std::chrono::milliseconds& _timerResolution, ThreadPool& _threadPoolRef)
 	: m_timerResolution(_timerResolution), m_threadPoolRef(_threadPoolRef)
 {
-	m_afterShutdown = [this]()
-		{
-			m_tickSem.release();
-
-			m_tickThread.join();
-		};
-
 	m_tickThread = std::thread([this]()
 		{
 			auto waitDuration = m_timerResolution;
-			while (!IsShutdown())
+			while (!IsShutdownStarted())
 			{
 				std::ignore = m_tickSem.try_acquire_for(waitDuration);
 				waitDuration = m_timerResolution;
 
 				TimerJobShared_t job;
-				TickTime_t current = GET_TICK();
-				while (m_timerJobs.try_pop(job) && !IsShutdown())
+				SteadyTime_t current = GetSteadyTime();
+				while (m_timerJobs.try_pop(job) && !IsShutdownStarted())
 				{
 					if (job->accessor->canceled)
 					{
@@ -41,7 +34,27 @@ TimerJobManagerImpl::TimerJobManagerImpl(const std::chrono::milliseconds& _timer
 		});
 }
 
-TimerJobAccessor_t TimerJobManagerImpl::PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode)
+void TimerJobManagerImpl::RegisterShutdownSteps(ShutdownCoordinator& _coordinator)
+{
+	_coordinator.PushStopping("timer job manager release tick thread", [this]()
+		{
+			m_tickSem.release();
+
+			return EStepResult::Done;
+		});
+
+	_coordinator.PushStopping("timer job manager join tick thread", [this]()
+		{
+			if (m_tickThread.joinable())
+			{
+				m_tickThread.join();
+			}
+
+			return EStepResult::Done;
+		});
+}
+
+TimerJobAccessor_t TimerJobManagerImpl::PushTimerJob(ThreadPool::JobInst_t&& _jobInst, const SteadyTime_t& _elapsedTickTime, const ETimerJobRepeatMode& _repeatMode)
 {
 	return PushTimerJobImpl(std::move(_jobInst), _elapsedTickTime, "", _repeatMode);
 }
@@ -51,9 +64,9 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJob(ThreadPool::JobInst_t&& _jo
 	return PushTimerJobImpl(std::move(_jobInst), 0, _cronString, _repeatMode);
 }
 
-TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&& _jobInst, const TickTime_t& _elapsedTickTime, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode)
+TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&& _jobInst, const SteadyTime_t& _elapsedTickTime, const std::string& _cronString, const ETimerJobRepeatMode& _repeatMode)
 {
-	if (IsShutdown())
+	if (IsShutdownStarted())
 	{
 		return nullptr;
 	}
@@ -74,16 +87,16 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&&
 
 	if (!_cronString.empty())
 	{
-		auto const nextTimeSec = cron::cron_next(timerJob->cronExpr, GET_TIME() / static_cast<TickTime_t>(TimeUnit::SecToMs));
+		auto const nextTimeSec = cron::cron_next(timerJob->cronExpr, GetTime() / static_cast<SteadyTime_t>(TimeUnit::SEC_TO_MS));
 		if (nextTimeSec == cron::INVALID_TIME)
 		{
 			return INVALID_TIMER_JOB_ACCESSOR;
 		}
-		timerJob->expireTickTime = (nextTimeSec * static_cast<TickTime_t>(TimeUnit::SecToMs));
+		timerJob->expireTickTime = (nextTimeSec * static_cast<SteadyTime_t>(TimeUnit::SEC_TO_MS));
 	}
 	else
 	{
-		timerJob->expireTickTime = _elapsedTickTime + GET_TICK();
+		timerJob->expireTickTime = _elapsedTickTime + GetSteadyTime();
 	}
 
 	m_timerJobs.push(timerJob);
@@ -92,9 +105,9 @@ TimerJobAccessor_t TimerJobManagerImpl::PushTimerJobImpl(ThreadPool::JobInst_t&&
 	return timerJob->accessor;
 }
 
-void TimerJobManagerImpl::RepeatTimerJob(const TimerJobShared_t& _timerJob, const TickTime_t& _nowTickTime)
+void TimerJobManagerImpl::RepeatTimerJob(const TimerJobShared_t& _timerJob, const SteadyTime_t& _nowTickTime)
 {
-	if (IsShutdown())
+	if (IsShutdownStarted())
 	{
 		return;
 	}
@@ -106,12 +119,12 @@ void TimerJobManagerImpl::RepeatTimerJob(const TimerJobShared_t& _timerJob, cons
 
 	if (!cron::to_cronstr(_timerJob->cronExpr).empty())
 	{
-		auto const nextTimeSec = cron::cron_next(_timerJob->cronExpr, _nowTickTime / static_cast<TickTime_t>(TimeUnit::SecToMs));
+		auto const nextTimeSec = cron::cron_next(_timerJob->cronExpr, _nowTickTime / static_cast<SteadyTime_t>(TimeUnit::SEC_TO_MS));
 		if (nextTimeSec == cron::INVALID_TIME)
 		{
 			return;
 		}
-		_timerJob->expireTickTime = (nextTimeSec * static_cast<TickTime_t>(TimeUnit::SecToMs));
+		_timerJob->expireTickTime = (nextTimeSec * static_cast<SteadyTime_t>(TimeUnit::SEC_TO_MS));
 	}
 	else
 	{
@@ -126,7 +139,7 @@ void TimerJobManagerImpl::OnTime(TimerJobShared_t&& _timerJob)
 
 	if (ETimerJobRepeatMode::OnTime == _timerJob->repeatMode)
 	{
-		self->RepeatTimerJob(_timerJob, GET_TICK());
+		self->RepeatTimerJob(_timerJob, GetSteadyTime());
 	}
 
 	auto job = [timerJob = std::move(_timerJob), self]()
@@ -147,7 +160,7 @@ void TimerJobManagerImpl::OnTime(TimerJobShared_t&& _timerJob)
 			case ETimerJobRepeatMode::AfterJob:
 				{
 					timerJob->jobInst->operator()();
-					self->RepeatTimerJob(timerJob, GET_TICK());
+					self->RepeatTimerJob(timerJob, GetSteadyTime());
 				}
 				break;
 			}
@@ -159,36 +172,43 @@ void TimerJobManagerImpl::OnTime(TimerJobShared_t&& _timerJob)
 
 TimerJobManagerAllocator::TimerJobManagerAllocator()
 {
-	m_afterShutdown = [this]()
+}
+
+void TimerJobManagerAllocator::RegisterShutdownSteps(ShutdownCoordinator& _coordinator)
+{
+	// AllocTimerJobManager checks the shutdown state under the same lock,
+	// so anything not moved out here shuts itself down.
+	decltype(m_timerJobManagers) targets;
+	{
+		SCOPED_WRITE_LOCK(m_mutex);
+		targets = std::move(m_timerJobManagers);
+	}
+
+	for (auto& manager : targets)
+	{
+		manager->Shutdown(_coordinator, "timer job manager wait shutdown counter.");
+	}
+
+	_coordinator.Push("timer job manager allocator release", [targets = std::move(targets)]() mutable
 		{
-			decltype(m_timerJobManagers) temp;
-			{
-				SCOPED_WRITE_LOCK(m_mutex);
-				temp = std::move(m_timerJobManagers);
-			}
+			targets.clear();
 
-			for (auto& manager : temp)
-			{
-				manager->Shutdown("timer job manager wait shutdown counter.");
-			}
-
-			temp.clear();
-		};
+			return EStepResult::Done;
+		});
 }
 
 TimerJobManagerImplShared_t TimerJobManagerAllocator::AllocTimerJobManager(const std::chrono::milliseconds& _timerResolution, ThreadPool& _threadPool)
 {
-	if (IsShutdown())
+	SCOPED_WRITE_LOCK(m_mutex);
+	if (IsShutdownStarted())
 	{
 		return TimerJobManagerImplShared_t();
 	}
 
+	// create in the lock. a manager made outside could miss the registration
+	// and would have to be shut down on the caller's thread.
 	auto manager = TimerJobManagerImpl::Create(_timerResolution, _threadPool);
-
-	{
-		SCOPED_WRITE_LOCK(m_mutex);
-		m_timerJobManagers.emplace_back(manager);
-	}
+	m_timerJobManagers.emplace_back(manager);
 
 	return manager;
 }
