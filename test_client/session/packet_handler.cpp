@@ -1,6 +1,6 @@
 #include "pch.h"
 
-bool g_printTestMessage = false;
+bool g_printTestMessage = true;
 
 bool Handler(Session& _session, Client::TestMessage&& _packet)
 {
@@ -10,7 +10,7 @@ bool Handler(Session& _session, Client::TestMessage&& _packet)
     std::string& body = _packet.body;
     if (g_printTestMessage)
     {
-        Log("{}, {}", title.c_str(), body.c_str());
+        Log("got it back : {}", body.c_str());
     }
 
     return true;

@@ -10,9 +10,12 @@ bool Handler(UserSession& _user, Client::TestMessage&& _packet)
 
 	auto serializedInfo{ ZppBits::Serialize(res) };
 
+	Log("received test message : {}", _packet.body);
+
 	_user.PushJob([serializedInfo](UserSession& _user) mutable
 		{
 			_user.Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
+			Log("to return");
 		}
 	);
 

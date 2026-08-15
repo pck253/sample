@@ -195,10 +195,12 @@ void TestSendFunc(uint64_t sendIndex, SessionShared_t _session)
 	++sendIndex;
 
 	auto title = std::format("test message {}", sendIndex);
-	Client::TestMessage packet(title, ::data[0]);
+	Client::TestMessage packet(title, ::data[sendIndex]);
 
 	auto serializedInfo{ ZppBits::Serialize(packet) };
 	_session->Send(serializedInfo.serializedSize, serializedInfo.serializedBuffer, serializedInfo.deallocator);
+
+	Log("sent test message");
 
 	if (sendIndex == 66)
 	{
@@ -210,7 +212,7 @@ void TestSendFunc(uint64_t sendIndex, SessionShared_t _session)
 			TestSendFunc(sendIndex, _session);
 		});
 
-	Module::As<TestClient>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 16);
+	Module::As<TestClient>().GetTimerJobManager()->PushTimerJob(std::move(jobInst), 1000);
 }
 // ------------------------------------------------------------------------------------------
 
